@@ -1,0 +1,16 @@
+name: rust-lightning
+
+owner: lightningdevkit
+repo: rust-lightning
+
+language: Rust
+ccs:
+- dergoegge
+
+engines:
+- LibFuzzer
+#- None
+sanitizers:
+- None
+- ValueProfile
+#- Coverage

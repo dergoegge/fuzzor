@@ -1,0 +1,155 @@
+FROM debian:sid-slim
+
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
+  ninja-build \
+  libgtk-3-dev \
+  pax-utils \
+  python3-msgpack \
+  python3-jinja2 \
+  curl \
+  cpio \
+  git \
+  build-essential \
+  binutils-dev \
+  libtool \
+  autotools-dev \
+  automake \
+  pkg-config \
+  gnuplot \
+  bsdmainutils \
+  openssh-client \
+  python3 \
+  ccache \
+  rsync \
+  cmake \
+  libz3-dev \
+  linux-perf
+
+#RUN git clone https://github.com/rui314/mold.git
+#RUN mkdir mold/build && cd mold/build && \
+#  git checkout v2.3.1 && ../install-build-deps.sh && \
+#  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=c++ .. && \
+#  cmake --build . -j $(nproc) && cmake --build . --target install
+
+RUN git clone --depth 1 --branch "llvmorg-18.1.7" https://github.com/llvm/llvm-project.git
+
+# Build clang and runtimes
+RUN mkdir clang_build && \
+  cmake -G Ninja -B clang_build/ \
+    -DLLVM_ENABLE_PROJECTS="clang;lld" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DLLVM_BINUTILS_INCDIR=/usr/include \
+    -DLLVM_TARGETS_TO_BUILD=Native \
+    -DLLVM_ENABLE_RUNTIMES="compiler-rt;libcxx;libcxxabi;libunwind" \
+    -S /llvm-project/llvm \
+  && ninja -C clang_build/ "-j$(nproc)" \
+  && ninja -C clang_build/ install
+
+# TODO: This fixes weird compile issues. Why?
+RUN rm -rf $(which ld) && ln -s $(which ld.lld) /usr/bin/ld 
+
+# Build libc++ for MSan
+#RUN mkdir libcxx_msan && \
+#  cmake -G Ninja -B /libcxx_msan \
+#    -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi;libunwind' \
+#    -DCMAKE_BUILD_TYPE=Release \
+#    -DLLVM_USE_SANITIZER=MemoryWithOrigins \
+#    -DCMAKE_C_COMPILER=clang \
+#    -DCMAKE_CXX_COMPILER=clang++ \
+#    -DLLVM_TARGETS_TO_BUILD=Native \
+#    -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF \
+#    -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
+#    -DLIBCXX_HARDENING_MODE=debug \
+#    -S /llvm-project/runtimes \
+#  && ninja -C /libcxx_msan "-j$(nproc)" 
+#
+#ENV MSAN_LIBCXX_PATH=/libcxx_msan
+
+# Clone AFLplusplus and build
+# this should come from our custom clang build?
+ENV LLVM_CONFIG=llvm-config
+RUN git clone --branch stable https://github.com/AFLplusplus/AFLplusplus
+RUN cd AFLplusplus && make PERFORMANCE=1 install -j$(nproc)
+
+# Install rust
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install FlameGraph
+RUN git clone --depth 1 https://github.com/brendangregg/FlameGraph
+ENV FLAMEGRAPH_REPO=$PWD/FlameGraph
+
+WORKDIR /types
+COPY ./types/Cargo.toml ./types/Cargo.lock .
+RUN mkdir .cargo && cargo vendor > .cargo/config
+COPY ./types/src/ src
+RUN cargo build --release
+
+WORKDIR /ensemble-fuzz
+COPY ./ensemble-fuzz/Cargo.toml ./ensemble-fuzz/Cargo.lock .
+RUN mkdir .cargo && cargo vendor > .cargo/config
+COPY ./ensemble-fuzz/src/ src
+RUN cargo build --release
+RUN cargo install --path . --verbose
+
+WORKDIR /reproducer
+COPY ./reproducer/Cargo.toml ./reproducer/Cargo.lock .
+RUN mkdir .cargo && cargo vendor > .cargo/config
+COPY ./reproducer/src/ src
+RUN cargo build --release
+RUN cargo install --path . --verbose
+
+WORKDIR /minimizer
+COPY ./minimizer/Cargo.toml ./minimizer/Cargo.lock .
+RUN mkdir .cargo && cargo vendor > .cargo/config
+COPY ./minimizer/src/ src
+RUN cargo build --release
+RUN cargo install --path . --verbose
+
+WORKDIR /builder
+COPY ./builder/Cargo.toml ./builder/Cargo.lock .
+RUN mkdir .cargo && cargo vendor > .cargo/config
+COPY ./builder/src/ src
+RUN cargo build --release
+RUN cargo install --path . --verbose
+
+WORKDIR /fuzzer
+COPY ./fuzzer/Cargo.toml ./fuzzer/Cargo.lock .
+RUN mkdir .cargo && cargo vendor > .cargo/config
+COPY ./fuzzer/src/ src
+RUN cargo build --release
+RUN cargo install --path . --verbose
+
+WORKDIR /coverage-reporter
+COPY ./coverage-reporter/Cargo.toml ./coverage-reporter/Cargo.lock .
+RUN mkdir .cargo && cargo vendor > .cargo/config
+COPY ./coverage-reporter/src/ src
+RUN cargo build --release
+RUN cargo install --path . --verbose
+
+RUN cargo install rustfilt
+
+WORKDIR /workdir
+RUN mkdir --parents workspace/corpus
+RUN mkdir --parents workspace/min_corpus
+
+# CI mode reduces the amount of resources used to build projects images
+ARG FUZZOR_CI=
+ENV FUZZOR_CI=$FUZZOR_CI
+# Location for the harness binaries
+ARG FUZZOR_HARNESSES=/workdir/out
+ENV FUZZOR_HARNESSES=$FUZZOR_HARNESSES
+
+# Some afl++ options
+ENV AFL_FUZZER_STATS_UPDATE_INTERVAL=10
+ENV AFL_NO_CRASH_README=1
+ENV AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1
+ENV AFL_SKIP_CPUFREQ=1
+ENV AFL_HANG_TMOUT=60000
+
+RUN touch ubsan_suppressions
+ENV ASAN_OPTIONS="detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:abort_on_error=1:symbolize=0:exitcode=75"
+ENV UBSAN_OPTIONS="suppressions=/workdir/ubsan_suppressions:print_stacktrace=1:halt_on_error=1:report_error_type=1:exitcode=76"
+
+# Enable env_logger by default with level info
+ENV RUST_LOG=trace

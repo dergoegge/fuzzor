@@ -1,0 +1,77 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-crates:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install rust nightly
+      run: rustup install nightly && rustup override set nightly
+
+    - name: Build fuzzor
+      run: cd fuzzor && cargo build --verbose
+    - name: Run fuzzor tests
+      run: cd fuzzor && cargo test --verbose
+
+    - name: Build infra/ensemble-fuzz
+      run: cd infra/ensemble-fuzz && cargo build --verbose
+    - name: Run infra/ensemble-fuzz tests
+      run: cd infra/ensemble-fuzz && cargo test --verbose
+
+    - name: Build infra/types
+      run: cd infra/types && cargo build --verbose
+    - name: Run infra/types tests
+      run: cd infra/types && cargo test --verbose
+
+    - name: Build infra/reproducer
+      run: cd infra/reproducer && cargo build --verbose
+    - name: Run infra/reproducer tests
+      run: cd infra/reproducer && cargo test --verbose
+
+    - name: Build infra/builder
+      run: cd infra/builder && cargo build --verbose
+    - name: Run infra/builder tests
+      run: cd infra/builder && cargo test --verbose
+
+    - name: Build infra/minimizer
+      run: cd infra/minimizer && cargo build --verbose
+    - name: Run infra/minimizer tests
+      run: cd infra/minimizer && cargo test --verbose
+
+    - name: Build infra/coverage-reporter
+      run: cd infra/coverage-reporter && cargo build --verbose
+    - name: Run infra/coverage-reporter tests
+      run: cd infra/coverage-reporter && cargo test --verbose
+
+    - name: Build infra/fuzzer
+      run: cd infra/fuzzer && cargo build --verbose
+    - name: Run infra/fuzzer tests
+      run: cd infra/fuzzer && cargo test --verbose
+  validate-configs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install rust nightly
+        run: rustup install nightly && rustup override set nightly
+
+      - name: Build validate-configs
+        run: |
+          cd fuzzor
+          cargo run --bin validate-config -- ../projects/bitcoin/config.yaml
+          cargo run --bin validate-config -- ../projects/core-lightning/config.yaml
+          cargo run --bin validate-config -- ../projects/rust-lightning/config.yaml
+          cargo run --bin validate-config -- ../projects/test/config.yaml
+

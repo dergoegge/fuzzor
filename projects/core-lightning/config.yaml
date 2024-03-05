@@ -1,0 +1,14 @@
+name: core-lightning
+
+owner: ElementsProject
+repo: lightning
+
+language: C
+ccs:
+- dergoegge
+
+engines:
+- LibFuzzer
+sanitizers:
+- ValueProfile
+- None

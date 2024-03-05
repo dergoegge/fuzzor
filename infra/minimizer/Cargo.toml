@@ -1,0 +1,17 @@
+[package]
+name = "minimizer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.37", features = ["full"] }
+clap = { version = "4.5.4", features = ["derive", "string"] }
+env_logger = "0.11.3"
+log = "0.4.21"
+fuzzor_infra = { path = "../types", package = "types", version = "0.1.0"}
+serde = { version = "1.0.197", features = ["derive"] }
+serde_yaml = "0.9.32"
+
+[[bin]]
+name = "minimizer"
+path = "src/main.rs"

@@ -1,0 +1,22 @@
+[package]
+name = "ensemble-fuzz"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1.80"
+clap = { version = "4.5.4", features = ["derive", "string"] }
+env_logger = "0.11.3"
+log = "0.4.21"
+num_cpus = "1.16.0"
+rand = "0.8.5"
+regex = "1.10.4"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_yaml = "0.9.32"
+tokio = { version = "1.37", features = ["full"] }
+
+fuzzor_infra = { path = "../types", package = "types", version = "0.1.0"}
+
+[[bin]]
+name = "ensemble-fuzz"
+path = "src/main.rs"
