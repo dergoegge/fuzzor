@@ -1,0 +1,29 @@
+[package]
+name = "fuzzor"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+base64 = "0.22.0"
+bollard = { version = "0.16.0", features = ["buildkit"] }
+env_logger = "0.11.3"
+futures-util = "0.3.30"
+hex = "0.4.3"
+log = "0.4.21"
+octocrab = "0.38.0"
+rand = "0.8.5"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_yaml = "0.9.32"
+sha1 = "0.10.6"
+tar = "0.4.40"
+tokio = { version = "1.37", features = ["full"] }
+clap = { version = "4.5.4", features = ["derive", "string"] }
+
+fuzzor_infra = { path = "../infra/types", package = "types", version = "0.1.0"}
+git2 = "0.18.3"
+async-trait = "0.1.80"
+num_cpus = "1.16.0"
+serde_json = "1.0.117"
+homedir = "0.2.1"

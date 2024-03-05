@@ -1,0 +1,14 @@
+name: lnd
+
+owner: lightningnetwork
+repo: lnd
+
+language: Go
+ccs:
+- dergoegge
+
+engines:
+- LibFuzzer
+sanitizers:
+- None
+- ValueProfile

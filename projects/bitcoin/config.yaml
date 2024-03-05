@@ -1,0 +1,22 @@
+name: bitcoin
+
+owner: bitcoin
+repo: bitcoin
+
+language: Cpp
+ccs:
+- dergoegge
+
+engines:
+- LibFuzzer
+- AflPlusPlus
+- None
+sanitizers:
+- Address
+- Undefined
+- Coverage # Create builds for coverage reports
+- CmpLog
+- ValueProfile
+- None
+
+fuzz_env_var: FUZZ

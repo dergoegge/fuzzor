@@ -1,0 +1,15 @@
+[package]
+name = "coverage-reporter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0.197", features = ["derive"] }
+serde_yaml = "0.9.32"
+tokio = { version = "1.37", features = ["full"] }
+clap = { version = "4.5.4", features = ["derive", "string"] }
+fuzzor_infra = { path = "../types", package = "types", version = "0.1.0"}
+
+[[bin]]
+name = "coverage-reporter"
+path = "src/main.rs"

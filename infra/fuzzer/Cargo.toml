@@ -1,0 +1,17 @@
+[package]
+name = "fuzzer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.37", features = ["full"] }
+serde = { version = "1.0.197", features = ["derive"] }
+serde_yaml = "0.9.32"
+clap = { version = "4.5.4", features = ["derive", "string"] }
+
+fuzzor_infra = { path = "../types", package = "types", version = "0.1.0"}
+num_cpus = "1.16.0"
+
+[[bin]]
+name = "fuzzer"
+path = "src/main.rs"
