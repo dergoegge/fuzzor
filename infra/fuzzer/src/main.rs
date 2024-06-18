@@ -63,43 +63,47 @@ async fn main() -> Result<(), std::io::Error> {
     let mut command = tokio::process::Command::new("ensemble-fuzz");
     let mut supported_fuzzers = Vec::new();
 
-    if config.has_engine(&FuzzEngine::AflPlusPlus) {
-        supported_fuzzers.push((FuzzEngine::AflPlusPlus, Sanitizer::None));
-
-        for sanitizer in &[Sanitizer::CmpLog, Sanitizer::Undefined, Sanitizer::Address] {
-            supported_fuzzers.push((FuzzEngine::AflPlusPlus, sanitizer.clone()));
-        }
-
-        // Occupy left over cores with afl++ instances
-        command.arg("--aflpp-occupy");
-    }
-
-    if config.has_engine(&FuzzEngine::LibFuzzer) {
-        let mut libfuzzer_cores = 0;
+    let mut cores_assigned = 0;
+    if config.has_engine(&FuzzEngine::LibFuzzer) && num_cpus::get() > cores_assigned {
         supported_fuzzers.push((FuzzEngine::LibFuzzer, Sanitizer::None));
-        libfuzzer_cores += 1;
-        if config.has_sanitizer(&Sanitizer::ValueProfile) {
+        cores_assigned += 1;
+        if config.has_sanitizer(&Sanitizer::ValueProfile) && num_cpus::get() > cores_assigned {
             command.arg("--libfuzzer-value-profile");
-            libfuzzer_cores += 1;
+            cores_assigned += 1;
         }
 
         if !config.has_engine(&FuzzEngine::AflPlusPlus) {
             // We only add libFuzzer sanitizer instances if we haven't already afl++ instances.
-            for sanitizer in &[Sanitizer::Undefined, Sanitizer::Address] {
-                if config.has_sanitizer(sanitizer) {
+            for sanitizer in &[Sanitizer::Address, Sanitizer::Undefined] {
+                if config.has_sanitizer(sanitizer) && num_cpus::get() > cores_assigned {
                     supported_fuzzers.push((FuzzEngine::LibFuzzer, sanitizer.clone()));
-                    libfuzzer_cores += 1;
+                    cores_assigned += 1;
                 }
             }
         }
 
         if !config.has_engine(&FuzzEngine::AflPlusPlus) {
             // Allocate additional cores to libfuzzer if afl++ is not enabled
-            command.arg("--libfuzzer-add-cores");
-            if num_cpus::get() > libfuzzer_cores {
-                command.arg((num_cpus::get() - libfuzzer_cores).to_string());
+            if num_cpus::get() > cores_assigned {
+                command.arg("--libfuzzer-add-cores");
+                command.arg((num_cpus::get() - cores_assigned).to_string());
             }
         }
+    }
+
+    if config.has_engine(&FuzzEngine::AflPlusPlus) && num_cpus::get() > cores_assigned {
+        supported_fuzzers.push((FuzzEngine::AflPlusPlus, Sanitizer::None));
+        cores_assigned += 1;
+
+        for sanitizer in &[Sanitizer::CmpLog, Sanitizer::Address, Sanitizer::Undefined] {
+            if num_cpus::get() > cores_assigned {
+                supported_fuzzers.push((FuzzEngine::AflPlusPlus, sanitizer.clone()));
+                cores_assigned += 1;
+            }
+        }
+
+        // Occupy left over cores with afl++ instances
+        command.arg("--aflpp-occupy");
     }
 
     for (engine, sanitizer) in supported_fuzzers.iter() {
