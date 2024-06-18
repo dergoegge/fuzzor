@@ -65,7 +65,7 @@ where
         let harness_name = harness.lock().await.name().to_string();
 
         log::info!(
-            "New campaign project='{}' harness='{}' env='{}'",
+            "New campaign: project='{}' harness='{}' env='{}'",
             &project_name,
             &harness_name,
             &env.get_id().await[..8],
@@ -318,7 +318,12 @@ where
         ))
         .await;
 
-        log::info!("Campaign task ended for harness: '{}'", self.harness_name);
+        log::info!(
+            "Campaign ended: project='{}' harness='{}' env='{}'",
+            self.project_name,
+            self.harness_name,
+            &self.env.get_id().await[..8]
+        );
     }
 }
 
