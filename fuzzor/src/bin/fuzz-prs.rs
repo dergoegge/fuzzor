@@ -19,10 +19,6 @@ use fuzzor::solutions::reporter::GitHubRepoSolutionReporter;
 use clap::Parser;
 use octocrab::Octocrab;
 
-// Needs to have read/write perms for issues and contents
-const GH_ACCESS_TOKEN: &str =
-    "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";
-
 #[derive(Parser, Debug, Clone)]
 struct Options {
     #[arg(long = "project", help = "Project to fuzz", required = true)]
@@ -74,10 +70,10 @@ struct GitHubReportingBuildFailureMonitor {
 unsafe impl Send for GitHubReportingBuildFailureMonitor {}
 
 impl GitHubReportingBuildFailureMonitor {
-    pub fn new(owner: &str, repo: &str, ccs: Vec<String>) -> Self {
+    pub fn new(owner: &str, repo: &str, ccs: Vec<String>, access_token: &str) -> Self {
         Self {
             github: Octocrab::builder()
-                .personal_token(GH_ACCESS_TOKEN.to_string())
+                .personal_token(access_token.to_string())
                 .build()
                 .unwrap(),
             repo: repo.to_string(),
@@ -130,6 +126,7 @@ struct PullRequestManager {
     parent_harnesses: SharedHarnessMap,
     opts: Options,
     projects_created: bool,
+    access_token: String,
 }
 
 unsafe impl Send for PullRequestManager {}
@@ -141,6 +138,7 @@ impl PullRequestManager {
         parent_folder: InMemoryProjectFolder,
         parent_harnesses: SharedHarnessMap,
         opts: Options,
+        access_token: &str,
     ) -> Self {
         Self {
             allocator,
@@ -149,6 +147,7 @@ impl PullRequestManager {
             projects_created: false,
             parent_harnesses,
             cores,
+            access_token: access_token.to_string(),
         }
     }
 
@@ -160,7 +159,7 @@ impl PullRequestManager {
                 parent_config.repo.clone(),
                 parent_config.owner.clone(),
                 *pr_num,
-                GH_ACCESS_TOKEN.to_string(),
+                self.access_token.clone(),
             )
             .await
             {
@@ -207,7 +206,7 @@ impl PullRequestManager {
                     SolutionReportingMonitor::new(GitHubRepoSolutionReporter::new(
                         "auto-fuzz",
                         "reports",
-                        GH_ACCESS_TOKEN,
+                        &self.access_token,
                         config.ccs.clone(),
                     ));
                 project.register_monitor(Box::new(solution_monitor));
@@ -248,6 +247,8 @@ impl ProjectMonitor for PullRequestManager {
 async fn main() -> Result<(), String> {
     env_logger::init();
 
+    let access_token = std::env::var("FUZZOR_GH_TOKEN").unwrap();
+
     let opts = Options::parse();
 
     let cores = Cores::new(0..num_cpus::get() as u64);
@@ -261,7 +262,7 @@ async fn main() -> Result<(), String> {
         config.owner.clone(),
         config.repo.clone(),
         config.branch.clone().unwrap_or(String::from("master")),
-        GH_ACCESS_TOKEN.to_string(),
+        access_token.clone(),
     );
 
     let builder = DockerBuilder::new(cores.clone(), opts.cores_per_build as usize, None);
@@ -298,18 +299,23 @@ async fn main() -> Result<(), String> {
         folder.clone(),
         project.harnesses(),
         opts.clone(),
+        &access_token,
     );
 
     let solution_monitor = SolutionReportingMonitor::new(GitHubRepoSolutionReporter::new(
         "auto-fuzz",
         "reports",
-        GH_ACCESS_TOKEN,
+        &access_token,
         config.ccs.clone(),
     ));
     project.register_monitor(Box::new(solution_monitor));
 
-    let build_monitor =
-        GitHubReportingBuildFailureMonitor::new("auto-fuzz", "reports", config.ccs.clone());
+    let build_monitor = GitHubReportingBuildFailureMonitor::new(
+        "auto-fuzz",
+        "reports",
+        config.ccs.clone(),
+        &access_token,
+    );
     project.register_monitor(Box::new(build_monitor));
 
     project.register_monitor(Box::new(pr_mngr));

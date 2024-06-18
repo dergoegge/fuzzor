@@ -137,8 +137,7 @@ RUN mkdir --parents workspace/min_corpus
 ARG FUZZOR_CI=
 ENV FUZZOR_CI=$FUZZOR_CI
 # Location for the harness binaries
-ARG FUZZOR_HARNESSES=/workdir/out
-ENV FUZZOR_HARNESSES=$FUZZOR_HARNESSES
+ENV FUZZOR_HARNESSES=/workdir/out
 
 # Some afl++ options
 ENV AFL_FUZZER_STATS_UPDATE_INTERVAL=10

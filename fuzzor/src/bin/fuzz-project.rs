@@ -124,7 +124,7 @@ async fn main() -> Result<(), String> {
 
     let opts = Options::parse();
 
-    let access_token = String::from("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");
+    let access_token = std::env::var("FUZZOR_GH_TOKEN").unwrap();
 
     let cores = Cores::new(0..num_cpus::get() as u64);
     let mut folder = InMemoryProjectFolder::from_folder(
