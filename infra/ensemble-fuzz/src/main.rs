@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use ensemble::start_ensemble_task;
-use fuzzer::{recommended_aflpp_settings, AflppFuzzer, LibFuzzer, SharedFuzzer};
+use fuzzer::{recommended_aflpp_settings, AflppFuzzer, LibFuzzer, SemSanFuzzer, SharedFuzzer};
 use options::EnsembleOptions;
 
 pub fn ensure_dir(path: PathBuf) -> PathBuf {
@@ -33,7 +33,9 @@ fn num_cores_requested(options: &EnsembleOptions) -> usize {
         options.libfuzzer_value_profile,
     ];
 
-    cores.into_iter().filter(|b| *b).count() + options.libfuzzer_additional_cores as usize
+    cores.into_iter().filter(|b| *b).count()
+        + options.libfuzzer_additional_cores as usize
+        + options.semsan_secondary_binaries.len()
 }
 
 fn setup_aflpp_instances(
@@ -183,11 +185,35 @@ fn setup_libfuzzer_instances(options: &EnsembleOptions, fuzzers: &mut Vec<Shared
     }
 }
 
+fn setup_semsan_instances(options: &EnsembleOptions, fuzzers: &mut Vec<SharedFuzzer>) {
+    let mut id = 0;
+    if let Some(primary) = &options.semsan_primary_binary {
+        for secondary in options.semsan_secondary_binaries.iter() {
+            let workdir = options.workspace.join(format!("semsan-{}", id));
+
+            let seeds = workdir.join("seeds");
+            let _ = std::fs::create_dir_all(&seeds);
+
+            fuzzers.push(Arc::new(Mutex::new(SemSanFuzzer::new(
+                primary.clone(),
+                secondary.clone(),
+                seeds,
+                workdir.join("solutions"),
+                workdir.join("pull_corpus"),
+                options.semsan_comparator.clone(),
+            ))));
+
+            id += 1;
+        }
+    }
+}
+
 fn setup_fuzzers(options: &EnsembleOptions, cores_requested: usize) -> Vec<SharedFuzzer> {
     let mut fuzzers: Vec<SharedFuzzer> = Vec::new();
 
     setup_aflpp_instances(options, cores_requested, &mut fuzzers);
     setup_libfuzzer_instances(options, &mut fuzzers);
+    setup_semsan_instances(options, &mut fuzzers);
 
     fuzzers
 }

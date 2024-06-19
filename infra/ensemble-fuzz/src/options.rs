@@ -46,6 +46,25 @@ pub struct EnsembleOptions {
     pub libfuzzer_additional_cores: u64,
 
     #[arg(
+        long = "semsan-primary-binary",
+        help = "Specify the binary for the primary SemSan harness"
+    )]
+    pub semsan_primary_binary: Option<PathBuf>,
+    #[arg(
+        long = "semsan-secondary-binaries",
+        help = "Specify one or more binaries for the secondary SemSan harnesses",
+        value_delimiter = ',',
+        requires = "semsan_primary_binary"
+    )]
+    pub semsan_secondary_binaries: Vec<PathBuf>,
+    #[arg(
+        long = "semsan-comparator",
+        help = "Specify the comparator used for semsan instances",
+        value_delimiter = ','
+    )]
+    pub semsan_comparator: String,
+
+    #[arg(
         long = "sync-interval",
         help = "Time between corpus syncs in seconds",
         default_value_t = 10
