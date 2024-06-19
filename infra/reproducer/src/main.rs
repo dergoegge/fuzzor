@@ -112,7 +112,6 @@ async fn reproduce(
 
     if let Some(code) = status.code() {
         let file_name = test_case.file_name().unwrap().to_str().unwrap();
-        let reproduced_solution = std::fs::File::create(output_dir.join(file_name))?;
 
         // Create a flamegraph for timeouts and read the stack trace from stdout/stderr for crashes.
         let trace = match code {
@@ -124,6 +123,7 @@ async fn reproduce(
             }
         };
 
+        let reproduced_solution = std::fs::File::create(output_dir.join(file_name))?;
         serde_yaml::to_writer(
             reproduced_solution,
             &ReproducedSolution {
