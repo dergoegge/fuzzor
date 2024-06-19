@@ -47,6 +47,98 @@ pub trait Fuzzer {
 
 pub type SharedFuzzer = Arc<Mutex<dyn Fuzzer + Send>>;
 
+pub struct SemSanFuzzer {
+    pub primary_binary: PathBuf,
+    pub secondary_binary: PathBuf,
+    pub seeds: PathBuf,
+    pub solutions: PathBuf,
+    pub pull_corpus: PathBuf,
+    pub comparator: String,
+}
+
+impl SemSanFuzzer {
+    pub fn new(
+        primary_binary: PathBuf,
+        secondary_binary: PathBuf,
+        seeds: PathBuf,
+        solutions: PathBuf,
+        pull_corpus: PathBuf,
+        comparator: String,
+    ) -> Self {
+        Self {
+            primary_binary,
+            secondary_binary,
+            seeds,
+            solutions,
+            pull_corpus,
+            comparator,
+        }
+    }
+}
+
+#[async_trait]
+impl Fuzzer for SemSanFuzzer {
+    fn get_name(&self) -> &str {
+        "semsan"
+    }
+    fn get_instance_name(&self) -> String {
+        self.get_name().to_string()
+    }
+    async fn get_stats(&self) -> FuzzerStats {
+        FuzzerStats {
+            saved_crashes: std::fs::read_dir(&self.seeds).unwrap().count() as u64,
+            // TODO parse other stats from stdout
+            ..Default::default()
+        }
+    }
+
+    fn get_push_corpus(&self) -> PathBuf {
+        // TODO SemSan does not actually push new inputs here, maybe the push corpus should be
+        // optional?
+        self.seeds.clone()
+    }
+
+    fn get_pull_corpus(&self) -> PathBuf {
+        self.pull_corpus.clone()
+    }
+
+    fn get_solutions(&self) -> Vec<PathBuf> {
+        vec![self.solutions.clone()]
+    }
+
+    fn start(&mut self) -> tokio::process::Child {
+        let _ = std::fs::create_dir_all(&self.solutions);
+        let _ = std::fs::create_dir_all(&self.seeds);
+        let _ = std::fs::create_dir_all(&self.pull_corpus);
+
+        if std::fs::read_dir(&self.seeds).unwrap().count() == 0 {
+            let mut dummy_input = std::fs::File::create(self.seeds.join("dummy_input")).unwrap();
+            dummy_input.write_all(b"AAA").unwrap();
+        }
+
+        let mut command = tokio::process::Command::new("semsan");
+        command.args(&["--comparator", &self.comparator, "--timeout", "5000"]);
+        command.args(&[&self.primary_binary, &self.secondary_binary]);
+        command.args(&[
+            "fuzz",
+            "--seeds",
+            self.seeds.to_str().unwrap(),
+            "--solutions",
+            self.solutions.to_str().unwrap(),
+            "--foreign-corpus",
+            self.pull_corpus.to_str().unwrap(),
+            "--ignore-solutions",
+        ]);
+
+        command
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap()
+    }
+}
+
 /// AflppFuzzer is an implementation of [`Fuzzer`] for the afl++ fuzz engine.
 pub struct AflppFuzzer {
     pub seeds: Option<PathBuf>,
@@ -165,9 +257,7 @@ impl Fuzzer for AflppFuzzer {
     fn start(&mut self) -> tokio::process::Child {
         self.out_dir = self.workspace.join("out");
         self.pull_corpus = self.workspace.join("pull_corpus");
-        if !self.pull_corpus.exists() {
-            std::fs::create_dir(&self.pull_corpus).unwrap();
-        }
+        let _ = std::fs::create_dir(&self.pull_corpus);
 
         let mut args = Vec::new();
 
