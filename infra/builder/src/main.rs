@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use clap::Parser;
-use fuzzor_infra::{get_harness_dir, FuzzEngine, Language, ProjectConfig, Sanitizer};
+use fuzzor_infra::{get_harness_dir, FuzzEngine, Language, ProjectConfig, Sanitizer, SemSanBuild};
 use tokio::{fs, process::Command};
 
 #[derive(Parser, Debug)]
@@ -41,8 +41,10 @@ impl<'a> BuildEnv<'a> {
     }
 }
 
-const AFL_CC: &str = "afl-clang-fast";
-const AFL_CXX: &str = "afl-clang-fast++";
+const AFL_CLANG_CC: &str = "afl-clang-fast";
+const AFL_CLANG_CXX: &str = "afl-clang-fast++";
+const AFL_GCC_CC: &str = "afl-gcc-fast";
+const AFL_GCC_CXX: &str = "afl-g++-fast";
 const SANITIZE_UNDEFINED: &str = "-fsanitize=array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr";
 const SANITIZE_UNDEFINED_FUZZER: &str = "-fsanitize=fuzzer,array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr";
 const SANITIZE_UNDEFINED_FUZZER_NO_LINK: &str = "-fsanitize=fuzzer-no-link,array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr";
@@ -55,22 +57,64 @@ async fn build_cpp(
     config: &ProjectConfig,
 ) -> Result<(), std::io::Error> {
     let env = match (engine, sanitizer) {
+        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(SemSanBuild::GccO0)) => BuildEnv {
+            cc: AFL_GCC_CC,
+            cxx: AFL_GCC_CXX,
+            ld: AFL_GCC_CC,
+            envs: &[("CFLAGS", "-O0"), ("CXXFLAGS", "-O0")],
+        },
+        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(SemSanBuild::GccO1)) => BuildEnv {
+            cc: AFL_GCC_CC,
+            cxx: AFL_GCC_CXX,
+            ld: AFL_GCC_CC,
+            envs: &[("CFLAGS", "-O1"), ("CXXFLAGS", "-O1")],
+        },
+        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(SemSanBuild::GccO2)) => BuildEnv {
+            cc: AFL_GCC_CC,
+            cxx: AFL_GCC_CXX,
+            ld: AFL_GCC_CC,
+            envs: &[("CFLAGS", "-O2"), ("CXXFLAGS", "-O2")],
+        },
+        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(SemSanBuild::ClangO0)) => BuildEnv {
+            cc: AFL_CLANG_CC,
+            cxx: AFL_CLANG_CXX,
+            ld: AFL_CLANG_CC,
+            envs: &[("CFLAGS", "-O0"), ("CXXFLAGS", "-O0")],
+        },
+        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(SemSanBuild::ClangO1)) => BuildEnv {
+            cc: AFL_CLANG_CC,
+            cxx: AFL_CLANG_CXX,
+            ld: AFL_CLANG_CC,
+            envs: &[("CFLAGS", "-O1"), ("CXXFLAGS", "-O1")],
+        },
+        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(SemSanBuild::ClangO2)) => BuildEnv {
+            cc: AFL_CLANG_CC,
+            cxx: AFL_CLANG_CXX,
+            ld: AFL_CLANG_CC,
+            envs: &[("CFLAGS", "-O2"), ("CXXFLAGS", "-O2")],
+        },
+        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(_)) => BuildEnv {
+            cc: AFL_CLANG_CC,
+            cxx: AFL_CLANG_CXX,
+            ld: AFL_CLANG_CC,
+            envs: &[],
+        },
         (FuzzEngine::AflPlusPlus, Sanitizer::None) => BuildEnv {
-            cc: AFL_CC,
-            cxx: AFL_CXX,
-            ld: AFL_CC,
+            cc: AFL_CLANG_CC,
+            cxx: AFL_CLANG_CXX,
+            ld: AFL_CLANG_CC,
             envs: &[],
         },
         (FuzzEngine::AflPlusPlus, Sanitizer::CmpLog) => BuildEnv {
-            cc: AFL_CC,
-            cxx: AFL_CXX,
-            ld: AFL_CC,
+            cc: AFL_CLANG_CC,
+            cxx: AFL_CLANG_CXX,
+            ld: AFL_CLANG_CC,
             envs: &[("AFL_LLVM_CMPLOG", "1"), ("CCACHE_DIR", "/ccache_cmplog/")],
         },
         (FuzzEngine::AflPlusPlus, Sanitizer::Undefined) => BuildEnv {
-            cc: AFL_CC,
-            cxx: AFL_CXX,
-            ld: AFL_CC,
+            cc: AFL_CLANG_CC,
+            cxx: AFL_CLANG_CXX,
+            ld: AFL_CLANG_CC,
             envs: &[
                 ("LIB_FUZZING_ENGINE", SANITIZE_UNDEFINED),
                 ("CFLAGS", SANITIZE_UNDEFINED),
@@ -78,9 +122,9 @@ async fn build_cpp(
             ],
         },
         (FuzzEngine::AflPlusPlus, Sanitizer::Address) => BuildEnv {
-            cc: AFL_CC,
-            cxx: AFL_CXX,
-            ld: AFL_CC,
+            cc: AFL_CLANG_CC,
+            cxx: AFL_CLANG_CXX,
+            ld: AFL_CLANG_CC,
             envs: &[
                 ("LIB_FUZZING_ENGINE", "-fsanitize=address"),
                 ("CFLAGS", "-fsanitize=address"),
@@ -137,13 +181,22 @@ async fn build_cpp(
     };
 
     let harness_dir = get_harness_dir(engine, sanitizer, config).unwrap();
-    let output_dir = output.join(harness_dir);
+    let output_dir = output.join(&harness_dir);
     if !output_dir.exists() {
         fs::create_dir_all(&output_dir).await?;
     }
 
     let mut envs = env.envs();
-    envs.insert("FUZZING_ENGINE", harness_dir);
+    envs.insert("FUZZING_ENGINE", &harness_dir);
+
+    let semsan_type = if let (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(t)) = (engine, sanitizer) {
+        Some(format!("{:?}", t))
+    } else {
+        None
+    };
+    if let Some(t) = &semsan_type {
+        envs.insert("SEMSAN_BUILD", &t);
+    }
 
     let res = Command::new(script)
         .envs(envs)
@@ -170,13 +223,13 @@ async fn build_rust(
         return Ok(());
     };
 
-    let output_dir = output.join(harness_dir);
+    let output_dir = output.join(&harness_dir);
     if !output_dir.exists() {
         fs::create_dir_all(&output_dir).await?;
     }
 
     let mut envs = HashMap::new();
-    envs.insert("FUZZING_ENGINE", harness_dir);
+    envs.insert("FUZZING_ENGINE", &harness_dir);
 
     let res = Command::new(script)
         .envs(envs)
@@ -203,13 +256,13 @@ async fn build_go(
         return Ok(());
     };
 
-    let output_dir = output.join(harness_dir);
+    let output_dir = output.join(&harness_dir);
     if !output_dir.exists() {
         fs::create_dir_all(&output_dir).await?;
     }
 
     let mut envs = HashMap::new();
-    envs.insert("FUZZING_ENGINE", harness_dir);
+    envs.insert("FUZZING_ENGINE", &harness_dir);
 
     let res = Command::new(script)
         .envs(envs)

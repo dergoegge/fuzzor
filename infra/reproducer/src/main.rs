@@ -84,7 +84,7 @@ async fn create_flame_graph_for_input(
     Ok(flame_graph_bytes)
 }
 
-async fn reproduce(
+async fn reproduce_crashes_and_timeouts(
     binary: PathBuf,
     test_case: PathBuf,
     output_dir: PathBuf,
@@ -104,8 +104,8 @@ async fn reproduce(
             "-timeout=1",
             &test_case_str,
         ])
-        .stdout(stderr)
-        .stderr(stdout)
+        .stdout(stdout)
+        .stderr(stderr)
         .kill_on_drop(true)
         .status()
         .await?;
@@ -139,6 +139,66 @@ async fn reproduce(
     }
 
     tokio::fs::remove_file(tmp_file).await?;
+    Ok(None)
+}
+
+async fn reproduce_differential_solution(
+    primary: PathBuf,
+    secondary: PathBuf,
+    test_case: PathBuf,
+    output_dir: PathBuf,
+) -> Result<Option<PathBuf>, std::io::Error> {
+    let seeds = std::env::temp_dir().join(Alphanumeric.sample_string(&mut rand::thread_rng(), 16));
+    let _ = tokio::fs::create_dir_all(&seeds).await;
+
+    let solutions =
+        std::env::temp_dir().join(Alphanumeric.sample_string(&mut rand::thread_rng(), 16));
+    let _ = tokio::fs::create_dir_all(&solutions).await;
+
+    tokio::fs::copy(&test_case, seeds.join(test_case.file_name().unwrap())).await?;
+
+    let stderr_path =
+        std::env::temp_dir().join(Alphanumeric.sample_string(&mut rand::thread_rng(), 16));
+    let stderr = std::fs::File::create(&stderr_path)?;
+
+    let mut semsan_cmd = tokio::process::Command::new("semsan");
+    // TODO semsan comparator
+    semsan_cmd.args(&["--timeout", "5000"]);
+    semsan_cmd.args(&["--solution-exit-code", "71"]);
+    semsan_cmd.args(&[&primary, &secondary]);
+    semsan_cmd.args(&["fuzz", "--seeds"]);
+    semsan_cmd.arg(&seeds);
+    semsan_cmd.arg("--solutions");
+    semsan_cmd.arg(&solutions);
+    semsan_cmd.arg("--run-seeds-once");
+
+    let status = semsan_cmd
+        .stdout(Stdio::null())
+        .stderr(stderr)
+        .kill_on_drop(true)
+        .status()
+        .await?;
+
+    if let Some(71) = status.code() {
+        let reproduced_solution =
+            std::fs::File::create(output_dir.join(test_case.file_name().unwrap()))?;
+        serde_yaml::to_writer(
+            reproduced_solution,
+            &ReproducedSolution {
+                code: 71,
+                input: tokio::fs::read(&test_case).await?,
+                trace: tokio::fs::read(&stderr_path).await?,
+            },
+        )
+        .unwrap();
+
+        return Ok(Some(test_case));
+    }
+
+    let _ = tokio::fs::remove_dir_all(&seeds).await;
+    let _ = tokio::fs::remove_dir_all(&solutions).await;
+    let _ = tokio::fs::remove_file(&stderr_path).await;
+
     Ok(None)
 }
 
@@ -176,6 +236,7 @@ async fn main() -> Result<(), std::io::Error> {
     let _ = tokio::fs::create_dir_all(&opts.output_dir).await;
 
     let mut repro_futures = futures::stream::FuturesUnordered::new();
+    let mut repro_futures_differential = futures::stream::FuturesUnordered::new();
 
     let sanitizers = vec![Sanitizer::None, Sanitizer::Undefined, Sanitizer::Address];
     let libfuzzer_bins: Vec<PathBuf> = sanitizers
@@ -186,16 +247,50 @@ async fn main() -> Result<(), std::io::Error> {
         })
         .collect();
 
+    let semsan_pairs: Vec<(PathBuf, PathBuf)> = if let Some(sanitizers) = &config.sanitizers {
+        sanitizers
+            .iter()
+            .filter(|s| matches!(s, Sanitizer::SemSan(_)))
+            .map(|s| {
+                (
+                    get_harness_binary(
+                        &FuzzEngine::AflPlusPlus,
+                        &Sanitizer::None,
+                        &opts.harness,
+                        &config,
+                    )
+                    .unwrap(),
+                    get_harness_binary(&FuzzEngine::AflPlusPlus, s, &opts.harness, &config)
+                        .unwrap(),
+                )
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     for dir_or_file in opts.solutions.iter() {
         if dir_or_file.is_file() {
             log::info!("Reproducing test case: {:?}", dir_or_file);
 
             for bin in libfuzzer_bins.iter() {
-                repro_futures.push(reproduce(
+                repro_futures.push(reproduce_crashes_and_timeouts(
                     bin.clone(),
                     dir_or_file.clone(),
                     opts.output_dir.clone(),
                 ));
+            }
+
+            if config.has_engine(&FuzzEngine::AflPlusPlus) && config.has_engine(&FuzzEngine::SemSan)
+            {
+                for (primary, secondary) in semsan_pairs.iter() {
+                    repro_futures_differential.push(reproduce_differential_solution(
+                        primary.clone(),
+                        secondary.clone(),
+                        dir_or_file.clone(),
+                        opts.output_dir.clone(),
+                    ));
+                }
             }
             continue;
         }
@@ -210,11 +305,24 @@ async fn main() -> Result<(), std::io::Error> {
                 }
 
                 for bin in libfuzzer_bins.iter() {
-                    repro_futures.push(reproduce(
+                    repro_futures.push(reproduce_crashes_and_timeouts(
                         bin.clone(),
                         entry.path(),
                         opts.output_dir.clone(),
                     ));
+                }
+
+                if config.has_engine(&FuzzEngine::AflPlusPlus)
+                    && config.has_engine(&FuzzEngine::SemSan)
+                {
+                    for (primary, secondary) in semsan_pairs.iter() {
+                        repro_futures_differential.push(reproduce_differential_solution(
+                            primary.clone(),
+                            secondary.clone(),
+                            entry.path(),
+                            opts.output_dir.clone(),
+                        ));
+                    }
                 }
             }
         }
@@ -229,5 +337,16 @@ async fn main() -> Result<(), std::io::Error> {
         }
     }
 
+    while let Some(res) = repro_futures_differential.next().await {
+        match res {
+            Ok(Some(trace_file)) => {
+                log::info!(
+                    "Reproduced differential solution, strack trace file: {:?}",
+                    trace_file
+                )
+            }
+            e => log::warn!("Test case did not reproduce: {:?}", e),
+        }
+    }
     Ok(())
 }

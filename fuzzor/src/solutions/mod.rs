@@ -1,7 +1,6 @@
 pub mod inmemory;
 pub mod reporter;
 
-
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use sha1::{Digest, Sha1};
 
@@ -28,9 +27,10 @@ impl Solution {
     pub fn from_crash(input_bytes: Vec<u8>, stack_trace: String) -> Self {
         let unique_id = Solution::create_unique_id(&input_bytes);
 
-        // Fallback to the unique id if we can't parse the libFuzzer stack trace. This will almost
-        // definitely lead to duplicate crashes and should be avoided.
-        let id = deduplication_id_from_libfuzzer_trace(&stack_trace).unwrap_or(unique_id.clone());
+        // Fallback to "crash" as deduplication id if the stack trace does not appear to be a
+        // libFuzzer trace.
+        let id =
+            deduplication_id_from_libfuzzer_trace(&stack_trace).unwrap_or(String::from("crash"));
 
         Self {
             id,
@@ -220,7 +220,7 @@ mod tests {
             let input = vec![0u8];
             let crash = Solution::from_crash(input, String::from(""));
             // Malformed stack trace uses unique id as id
-            assert_eq!(crash.id(), crash.unique_id());
+            assert_eq!(crash.id(), "crash");
         }
 
         {

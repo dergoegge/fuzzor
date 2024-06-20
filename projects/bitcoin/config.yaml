@@ -14,7 +14,7 @@ engines:
 sanitizers:
 - Address
 - Undefined
-- Coverage # Create builds for coverage reports
+- Coverage
 - CmpLog
 - ValueProfile
 - None

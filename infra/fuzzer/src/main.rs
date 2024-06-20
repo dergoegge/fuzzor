@@ -43,12 +43,14 @@ async fn main() -> Result<(), std::io::Error> {
                 Sanitizer::Undefined => Some("ubsan"),
                 Sanitizer::CmpLog => Some("cmplog"),
                 Sanitizer::ValueProfile => None,
+                Sanitizer::SemSan(_) => Some("secondary"),
             };
 
             let engine_str = match engine {
                 FuzzEngine::None => panic!("Can't add FuzzEngine::None to ensemble-fuzz flags"),
                 FuzzEngine::LibFuzzer => "libfuzzer",
                 FuzzEngine::AflPlusPlus => "aflpp",
+                FuzzEngine::SemSan => "semsan",
             };
 
             command.arg(
@@ -104,6 +106,21 @@ async fn main() -> Result<(), std::io::Error> {
 
         // Occupy left over cores with afl++ instances
         command.arg("--aflpp-occupy");
+    }
+
+    if config.has_engine(&FuzzEngine::SemSan) && num_cpus::get() > cores_assigned {
+        if let Some(sanitizers) = &config.sanitizers {
+            supported_fuzzers.push((FuzzEngine::SemSan, Sanitizer::None));
+            for sanitizer in sanitizers.iter() {
+                if matches!(sanitizer, &Sanitizer::SemSan(_))
+                    && config.has_sanitizer(sanitizer)
+                    && num_cpus::get() > cores_assigned
+                {
+                    supported_fuzzers.push((FuzzEngine::SemSan, sanitizer.clone()));
+                    cores_assigned += 1;
+                }
+            }
+        }
     }
 
     for (engine, sanitizer) in supported_fuzzers.iter() {

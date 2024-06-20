@@ -62,6 +62,29 @@ fn main() {
         } if !engines.contains(&FuzzEngine::None) && sanitizers.contains(&Sanitizer::Coverage) => {
             panic!("Coverage sanitizer needs FuzzEngine::None")
         }
+        ProjectConfig {
+            engines: Some(engines),
+            ..
+        } if engines.contains(&FuzzEngine::SemSan)
+            && !engines.contains(&FuzzEngine::AflPlusPlus) =>
+        {
+            panic!("AflPlusPlus must be enabled alongside SemSan");
+        }
+        ProjectConfig {
+            engines: Some(engines),
+            sanitizers: Some(sanitizers),
+            ..
+        } if engines.contains(&FuzzEngine::SemSan)
+            && sanitizers
+                .iter()
+                .filter(|s| matches!(s, &Sanitizer::SemSan(_)))
+                .count()
+                == 0 =>
+        {
+            panic!(
+                "SemSan engine can only be used with at least one user defined SemSan sanitizer. Include SemSan(n) in your config and provide a build step for `n`."
+            );
+        }
         _ => {}
     }
 }

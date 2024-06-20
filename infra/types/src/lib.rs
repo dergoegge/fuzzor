@@ -16,6 +16,7 @@ pub enum Language {
 pub enum FuzzEngine {
     LibFuzzer,
     AflPlusPlus,
+    SemSan,
     None,
 }
 
@@ -23,10 +24,40 @@ pub enum FuzzEngine {
 pub enum Sanitizer {
     Undefined,
     Address,
-    Coverage,     // Only for FuzzEngine::None
-    CmpLog,       // Only for FuzzEngine::AflPlusPlus
-    ValueProfile, // Only for FuzzEngine::LibFuzzer
+    Coverage,            // Only for FuzzEngine::None
+    CmpLog,              // Only for FuzzEngine::AflPlusPlus
+    ValueProfile,        // Only for FuzzEngine::LibFuzzer
+    SemSan(SemSanBuild), // Only in combination with FuzzEngine::AflPlusPlus
     None,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum SemSanBuild {
+    // Gcc build types with varying optimization levels
+    GccO0,
+    GccO1,
+    GccO2,
+    // Clang build types with varying optimization levels
+    ClangO0,
+    ClangO1,
+    ClangO2,
+    // User defined build types
+    Custom0,
+    Custom1,
+    Custom2,
+    Custom3,
+    Custom4,
+    Custom5,
+    Custom6,
+    Custom7,
+    Custom8,
+    Custom9,
+    Custom10,
+    Custom11,
+    Custom12,
+    Custom13,
+    Custom14,
+    Custom15,
 }
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
@@ -91,6 +122,7 @@ impl Hash for FuzzerStats {
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct ReproducedSolution {
     /// Reproduction exit code:
+    ///   - 71: Differential solution
     ///   - 75: ASan crash
     ///   - 76: UBSan crash
     ///   - 77: Regular crash (e.g. due to an assertion)
@@ -112,7 +144,7 @@ pub fn get_harness_dir(
     engine: &FuzzEngine,
     sanitizer: &Sanitizer,
     config: &ProjectConfig,
-) -> Option<&'static str> {
+) -> Option<String> {
     if !config.has_engine(engine) || !config.has_sanitizer(sanitizer) {
         // The project was not build for the requested engine or sanitizer, so there exists no path
         // to the requested binary.
@@ -120,26 +152,37 @@ pub fn get_harness_dir(
     }
 
     match (engine, sanitizer) {
-        (FuzzEngine::LibFuzzer, Sanitizer::None) => Some("libfuzzer"),
-        (FuzzEngine::LibFuzzer, Sanitizer::Undefined) => Some("libfuzzer_ubsan"),
-        (FuzzEngine::LibFuzzer, Sanitizer::Address) => Some("libfuzzer_asan"),
+        (FuzzEngine::LibFuzzer, Sanitizer::None) => Some(String::from("libfuzzer")),
+        (FuzzEngine::LibFuzzer, Sanitizer::Undefined) => Some(String::from("libfuzzer_ubsan")),
+        (FuzzEngine::LibFuzzer, Sanitizer::Address) => Some(String::from("libfuzzer_asan")),
         (FuzzEngine::LibFuzzer, Sanitizer::Coverage) => None,
         (FuzzEngine::LibFuzzer, Sanitizer::CmpLog) => None,
         (FuzzEngine::LibFuzzer, Sanitizer::ValueProfile) => None,
+        (FuzzEngine::LibFuzzer, Sanitizer::SemSan(_)) => None,
 
-        (FuzzEngine::AflPlusPlus, Sanitizer::None) => Some("aflpp"),
-        (FuzzEngine::AflPlusPlus, Sanitizer::Undefined) => Some("aflpp_ubsan"),
-        (FuzzEngine::AflPlusPlus, Sanitizer::Address) => Some("aflpp_asan"),
+        (FuzzEngine::AflPlusPlus, Sanitizer::None) => Some(String::from("aflpp")),
+        (FuzzEngine::AflPlusPlus, Sanitizer::Undefined) => Some(String::from("aflpp_ubsan")),
+        (FuzzEngine::AflPlusPlus, Sanitizer::Address) => Some(String::from("aflpp_asan")),
         (FuzzEngine::AflPlusPlus, Sanitizer::Coverage) => None,
-        (FuzzEngine::AflPlusPlus, Sanitizer::CmpLog) => Some("aflpp_cmplog"),
+        (FuzzEngine::AflPlusPlus, Sanitizer::CmpLog) => Some(String::from("aflpp_cmplog")),
         (FuzzEngine::AflPlusPlus, Sanitizer::ValueProfile) => None,
+        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(t)) => Some(format!("semsan_{:?}", t)),
+
+        (FuzzEngine::SemSan, Sanitizer::None) => None,
+        (FuzzEngine::SemSan, Sanitizer::Undefined) => None,
+        (FuzzEngine::SemSan, Sanitizer::Address) => None,
+        (FuzzEngine::SemSan, Sanitizer::Coverage) => None,
+        (FuzzEngine::SemSan, Sanitizer::CmpLog) => None,
+        (FuzzEngine::SemSan, Sanitizer::ValueProfile) => None,
+        (FuzzEngine::SemSan, Sanitizer::SemSan(_)) => None,
 
         (FuzzEngine::None, Sanitizer::None) => None,
         (FuzzEngine::None, Sanitizer::Undefined) => None,
         (FuzzEngine::None, Sanitizer::Address) => None,
-        (FuzzEngine::None, Sanitizer::Coverage) => Some("coverage"),
+        (FuzzEngine::None, Sanitizer::Coverage) => Some(String::from("coverage")),
         (FuzzEngine::None, Sanitizer::CmpLog) => None,
         (FuzzEngine::None, Sanitizer::ValueProfile) => None,
+        (FuzzEngine::None, Sanitizer::SemSan(_)) => None,
         // Note: Make sure to explicitly specify all possible cases here, so the compiler warns us
         // when we add support for new sanitizers and forget to edit this.
     }
