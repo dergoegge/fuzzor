@@ -218,10 +218,12 @@ impl Environment for DockerEnv {
                 let solution: ReproducedSolution = solution;
                 let trace = String::from_utf8(solution.trace).unwrap();
 
-                if solution.code == 78 {
-                    solutions.push(Solution::from_timeout(solution.input, trace));
-                } else {
-                    solutions.push(Solution::from_crash(solution.input, trace));
+                match solution.code {
+                    78 => solutions.push(Solution::from_timeout(solution.input, trace)),
+                    71 => {
+                        solutions.push(Solution::from_differential_solution(solution.input, trace))
+                    }
+                    _ => solutions.push(Solution::from_crash(solution.input, trace)),
                 }
             }
         }

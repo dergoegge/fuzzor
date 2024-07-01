@@ -10,6 +10,8 @@ pub enum SolutionMetadata {
     Crash(String),
     /// Timeouts come with a flamegraph
     Timeout(String),
+
+    Differential(String),
 }
 
 /// Solution holds information about an interesting fuzz input.
@@ -23,6 +25,16 @@ pub struct Solution {
 }
 
 impl Solution {
+    pub fn from_differential_solution(input_bytes: Vec<u8>, stderr: String) -> Self {
+        let unique_id = Solution::create_unique_id(&input_bytes);
+        Self {
+            id: String::from("differential"),
+            unique_id,
+            input_bytes,
+            metadata: SolutionMetadata::Differential(stderr),
+        }
+    }
+
     /// Create a new solution from a crashing fuzz input and the crash's stack trace.
     pub fn from_crash(input_bytes: Vec<u8>, stack_trace: String) -> Self {
         let unique_id = Solution::create_unique_id(&input_bytes);

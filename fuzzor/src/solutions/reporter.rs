@@ -1,7 +1,7 @@
 use std::future::Future;
 
 use super::Solution;
-use super::SolutionMetadata::{Crash, Timeout};
+use super::SolutionMetadata::{Crash, Differential, Timeout};
 
 use octocrab::{models::repos::CommitAuthor, Octocrab};
 
@@ -121,6 +121,7 @@ impl SolutionReporter for GitHubRepoSolutionReporter {
                 match solution.metadata {
                     Crash(_) => "crashing",
                     Timeout(_) => "timeout",
+                    Differential(_) => "differential",
                 },
                 solution.id(),
             ),
@@ -155,6 +156,7 @@ impl SolutionReporter for GitHubRepoSolutionReporter {
         let label = match solution.metadata() {
             Crash(_) => String::from("Crash"),
             Timeout(_) => String::from("Timeout"),
+            Differential(_) => String::from("Differential"),
         };
 
         // We include the base64 encoded input in the issue but only if it is less than 10KB.
@@ -170,7 +172,7 @@ impl SolutionReporter for GitHubRepoSolutionReporter {
             .issues(&self.owner, &self.repo)
             .create(format!("{}: {} in `{}`", project, label, harness))
             .body(match solution.metadata() {
-                Crash(stack_trace) => format!(
+                Crash(stack_trace) | Differential(stack_trace) => format!(
                     "Deduplication key: {}\n\nTest case: {}\nBase64: \n```\n{}\n```\n\nStacktrace:\n ```\n{}```\n",
                     solution.id(), input_url, base64, stack_trace
                 ),
