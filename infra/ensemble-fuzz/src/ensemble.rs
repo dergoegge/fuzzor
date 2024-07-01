@@ -67,12 +67,15 @@ pub async fn start_ensemble_task(
     let task_handle = tokio::spawn(async move {
         // Sync the global fuzzer corpus every `sync_interval` seconds.
         use tokio::time::{interval, Duration};
+        let mut stats_interval = interval(Duration::from_secs(60));
         let mut interval = interval(Duration::from_secs(sync_interval));
 
         let mut quit = false;
         while !quit {
+            let mut only_stats = false;
             tokio::select! {
                 _ = interval.tick() => {},
+                _ = stats_interval.tick() => only_stats = true,
                 _ = rx.recv() => quit = true,
             };
 
@@ -83,13 +86,15 @@ pub async fn start_ensemble_task(
             let global_stats = aggregate_stats(fuzzers.as_mut_slice(), global_corpus.clone()).await;
             log::info!("{:?}", global_stats);
 
-            // Ensemble all fuzzer instances (i.e. sync the global corpus and solutions directory).
-            ensemble_fuzzers(
-                fuzzers.as_slice(),
-                global_corpus.clone(),
-                global_solutions.clone(),
-            )
-            .await;
+            if !only_stats || global_stats.has_solutions() {
+                // Ensemble all fuzzer instances (i.e. sync the global corpus and solutions directory).
+                ensemble_fuzzers(
+                    fuzzers.as_slice(),
+                    global_corpus.clone(),
+                    global_solutions.clone(),
+                )
+                .await;
+            }
 
             if let Ok(yaml) = serde_yaml::to_string(&global_stats) {
                 let mut file = std::fs::OpenOptions::new()

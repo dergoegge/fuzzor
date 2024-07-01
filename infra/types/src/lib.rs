@@ -118,6 +118,12 @@ impl Hash for FuzzerStats {
     }
 }
 
+impl FuzzerStats {
+    pub fn has_solutions(&self) -> bool {
+        (self.saved_hangs + self.saved_crashes) > 0
+    }
+}
+
 #[serde_as]
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct ReproducedSolution {
