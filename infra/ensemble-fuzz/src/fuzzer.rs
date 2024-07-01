@@ -86,7 +86,7 @@ impl Fuzzer for SemSanFuzzer {
     }
     async fn get_stats(&self) -> FuzzerStats {
         FuzzerStats {
-            saved_crashes: std::fs::read_dir(&self.seeds).unwrap().count() as u64,
+            saved_crashes: std::fs::read_dir(&self.solutions).unwrap().count() as u64,
             // TODO parse other stats from stdout
             ..Default::default()
         }
