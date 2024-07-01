@@ -1,7 +1,14 @@
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/shm.h>
+#include <sys/types.h>
 #include <unistd.h>
+
+uint8_t *diff_value = NULL;
 
 uint32_t buggy_fn(const uint8_t *data, size_t size) {
   if (size > 0 && data[0] == 'f') {
@@ -33,6 +40,18 @@ uint32_t buggy_fn(const uint8_t *data, size_t size) {
               sleep(10);
               break;
             }
+            case 'd': {
+              if (!diff_value) {
+                break;
+              }
+
+#if defined(__clang__)
+              diff_value[0] = 'c';
+#else
+              diff_value[0] = 'o';
+#endif
+              break;
+            }
             }
           }
         }
@@ -51,6 +70,14 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 __AFL_FUZZ_INIT();
 int main(int argc, char **argv) {
   __AFL_INIT();
+
+  const char *shmem_id = getenv("SEMSAN_CHARACTERIZATION_SHMEM_ID");
+  if (shmem_id) {
+    diff_value = shmat(atoi(shmem_id), NULL, 0);
+    assert(diff_value);
+    memset(diff_value, 0, 32);
+  }
+
   const uint8_t *buffer = __AFL_FUZZ_TESTCASE_BUF;
   while (__AFL_LOOP(100000)) {
     int buffer_len = __AFL_FUZZ_TESTCASE_LEN;

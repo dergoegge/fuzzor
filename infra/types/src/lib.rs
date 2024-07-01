@@ -174,13 +174,13 @@ pub fn get_harness_dir(
         (FuzzEngine::AflPlusPlus, Sanitizer::ValueProfile) => None,
         (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(t)) => Some(format!("semsan_{:?}", t)),
 
-        (FuzzEngine::SemSan, Sanitizer::None) => None,
+        (FuzzEngine::SemSan, Sanitizer::None) => Some(String::from("aflpp")),
         (FuzzEngine::SemSan, Sanitizer::Undefined) => None,
         (FuzzEngine::SemSan, Sanitizer::Address) => None,
         (FuzzEngine::SemSan, Sanitizer::Coverage) => None,
         (FuzzEngine::SemSan, Sanitizer::CmpLog) => None,
         (FuzzEngine::SemSan, Sanitizer::ValueProfile) => None,
-        (FuzzEngine::SemSan, Sanitizer::SemSan(_)) => None,
+        (FuzzEngine::SemSan, Sanitizer::SemSan(t)) => Some(format!("semsan_{:?}", t)),
 
         (FuzzEngine::None, Sanitizer::None) => None,
         (FuzzEngine::None, Sanitizer::Undefined) => None,
