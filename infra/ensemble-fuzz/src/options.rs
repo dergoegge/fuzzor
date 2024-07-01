@@ -67,7 +67,7 @@ pub struct EnsembleOptions {
     #[arg(
         long = "sync-interval",
         help = "Time between corpus syncs in seconds",
-        default_value_t = 10
+        default_value_t = 600
     )]
     pub sync_interval: u64,
     #[arg(long = "max-duration", help = "Maximum fuzzing duration in seconds")]
