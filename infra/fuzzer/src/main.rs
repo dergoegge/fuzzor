@@ -98,7 +98,7 @@ async fn main() -> Result<(), std::io::Error> {
         cores_assigned += 1;
 
         for sanitizer in &[Sanitizer::CmpLog, Sanitizer::Address, Sanitizer::Undefined] {
-            if num_cpus::get() > cores_assigned {
+            if config.has_sanitizer(sanitizer) && num_cpus::get() > cores_assigned {
                 supported_fuzzers.push((FuzzEngine::AflPlusPlus, sanitizer.clone()));
                 cores_assigned += 1;
             }
