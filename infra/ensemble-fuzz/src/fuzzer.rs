@@ -395,6 +395,25 @@ pub fn recommended_aflpp_settings(
         &mut append_env,
     );
 
+    if std::env::var("ENSEMBLE_FUZZ_LIMIT_INPUT_LEN").is_ok() {
+        apply_aflpp_setting(
+            cores,
+            "AFL_INPUT_LEN_MAX",
+            Some("128"),
+            0.1,
+            &mut used_env_vars,
+            &mut append_env,
+        );
+        apply_aflpp_setting(
+            cores,
+            "AFL_INPUT_LEN_MAX",
+            Some("8192"),
+            0.1,
+            &mut used_env_vars,
+            &mut append_env,
+        );
+    }
+
     let mut used_args = HashMap::new();
     apply_aflpp_setting(cores, "-L", Some("0"), 0.1, &mut used_args, &mut append_arg);
     apply_aflpp_setting(cores, "-Z", None, 0.1, &mut used_args, &mut append_arg);
