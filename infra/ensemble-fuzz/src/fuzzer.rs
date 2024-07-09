@@ -220,15 +220,19 @@ impl Fuzzer for AflppFuzzer {
                 .parse()
                 .unwrap_or(0);
 
-            stats.stability = Some(
-                afl_fuzzer_stats
-                    .get("stability")
-                    .unwrap()
-                    .strip_suffix("%")
-                    .unwrap()
-                    .parse()
-                    .unwrap_or(0.0),
-            );
+            if self.id == 0 {
+                // Stability seems to be inaccurate for sanitized binaries, only
+                // collect from the main instance for now.
+                stats.stability = Some(
+                    afl_fuzzer_stats
+                        .get("stability")
+                        .unwrap()
+                        .strip_suffix("%")
+                        .unwrap()
+                        .parse()
+                        .unwrap_or(0.0),
+                );
+            }
         }
 
         stats
