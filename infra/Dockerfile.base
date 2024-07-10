@@ -32,7 +32,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
 #  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=c++ .. && \
 #  cmake --build . -j $(nproc) && cmake --build . --target install
 
-RUN git clone --depth 1 --branch "llvmorg-18.1.7" https://github.com/llvm/llvm-project.git
+RUN git clone --depth 1 --branch "llvmorg-18.1.8" https://github.com/llvm/llvm-project.git
 
 # Build clang and runtimes
 RUN mkdir clang_build && \
