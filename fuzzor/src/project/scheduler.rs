@@ -240,9 +240,10 @@ impl CampaignScheduler for CoverageBasedScheduler {
 
             // Schedule harnesses that reach the modified files
             log::info!(
-                "Attempting to schedule harnesses to reach {} modified files (project='{}')",
+                "Attempting to schedule harnesses to reach {} modified files (project='{}', files='{:?}')",
                 input.modified_files.len(),
-                self.project_config.name
+                self.project_config.name,
+                input.modified_files,
             );
             for file in input.modified_files.iter() {
                 for (harness_name, harness) in harnesses.iter() {
