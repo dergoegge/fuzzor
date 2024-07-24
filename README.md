@@ -1,3 +1,63 @@
+## Usage
+
+At the moment, fuzzor consists of two utilities: `fuzz-project` and `fuzz-prs`.
+
+```
+Usage: fuzz-project [OPTIONS] --project <PROJECT>
+
+Options:
+      --project <PROJECT>
+          Project to fuzz
+      --owner <OWNER>
+          Overwrite the repo owner from the config
+      --repo <REPO>
+          Overwrite the repo from the config
+      --branch <BRANCH>
+          Overwrite the branch from the config
+      --name <NAME>
+          Overwrite the name from the config
+      --harnesses <HARNESSES>
+          Specify the list of harnesses to fuzz
+      --cores-per-build <CORES_PER_BUILD>
+          Number of cores to use for builds [default: 16]
+      --cores-per-campaign <CORES_PER_CAMPAIGN>
+          Number of cores to use for each campaign [default: 16]
+      --campaign-duration <CAMPAIGN_DURATION>
+          Campaign duration in CPU hours [default: 16]
+  -h, --help
+          Print help
+```
+
+```
+Usage: fuzz-prs [OPTIONS] --project <PROJECT> --prs <PULL_REQUESTS>
+
+Options:
+      --project <PROJECT>
+          Project to fuzz
+      --prs <PULL_REQUESTS>
+          Specify the list of PRs to fuzz
+      --cores-per-build <CORES_PER_BUILD>
+          Number of cores to use for builds [default: 16]
+      --cores-per-campaign <CORES_PER_CAMPAIGN>
+          Number of cores to use for each campaign [default: 16]
+      --campaign-duration <CAMPAIGN_DURATION>
+          Campaign duration in CPU hours [default: 16]
+      --base-campaign-duration <BASE_CAMPAIGN_DURATION>
+          Campaign duration in CPU hours for the base project [default: 16]
+  -h, --help
+          Print help
+```
+
+### Initial setup
+
+The project specific docker images (e.g. `projects/bitcoin/Docker`) all build
+on top of the `fuzzor-base` image, which can be build from the docker file in
+`infra/Dockerfile.base`:
+
+```
+docker build --tag fuzzor-base:latest --file Dockerfile.base .
+```
+
 ### Environment vars
 
 - `FUZZOR_KILL_TIMEOUT`: How long to wait before killing a container when trying to stop it gracefully (in seconds)
