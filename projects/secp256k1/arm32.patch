@@ -1,0 +1,13 @@
+diff --git a/modules/secp256k1/secp256k1_api.c b/modules/secp256k1/secp256k1_api.c
+index 5f03b7a..7df0137 100644
+--- a/modules/secp256k1/secp256k1_api.c
++++ b/modules/secp256k1/secp256k1_api.c
+@@ -7,7 +7,7 @@
+ #if !defined(SECP255K1_COMMIT_9d560f992db26612ce2630b194aef5f44d63a530)
+ #include <src/scratch_impl.h>
+ #endif
+-#if defined(__i386__)
++#if defined(__i386__) ||  defined(__arm__)
+ #include <src/int128_struct.h>
+ #else
+ #include <src/int128_native_impl.h>

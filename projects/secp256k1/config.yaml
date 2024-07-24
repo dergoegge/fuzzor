@@ -1,0 +1,32 @@
+name: bitcoin
+
+owner: guidovranken
+repo: cryptofuzz
+
+language: Cpp
+ccs:
+- dergoegge
+
+engines:
+- LibFuzzer
+- AflPlusPlus
+- SemSan
+- None
+sanitizers:
+- CmpLog
+- ValueProfile
+- None
+- !SemSan ClangO0
+- !SemSan ClangO1 # skip clang -O2 (that's the default with afl-clang-fast)
+- !SemSan GccO0
+- !SemSan GccO1
+- !SemSan GccO2
+- !SemSan Custom0 # arm32 --with-asm=no
+- !SemSan Custom1 # arm32 --with-asm=arm32
+#- !SemSan Custom2 # x86_64 --with-asm=no 
+#- !SemSan Custom3 # x86_64 --with-asm=x86_64
+#- !SemSan Custom5 # i386
+- !SemSan Custom6 # --with-test-override-wide-multiply=int64
+- !SemSan Custom7 # --with-test-override-wide-multiply=int128
+- !SemSan Custom8 # --with-test-override-wide-multiply=int128_struct
+# TODO: more arches ppc{32,64}, riscv{32,64}
