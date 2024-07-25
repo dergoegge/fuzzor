@@ -56,7 +56,6 @@ git checkout .
 
 git apply ../shmem.patch # Makes cryptofuzz write to semsan's shmem buffer
 git apply ../gcc.patch # Allows us to build cryptofuzz with gcc
-git apply ../arm32.patch
 
 # Force cpu_features to compile for the right architecure
 if [[ $FUZZING_ENGINE =~ semsan_Custom[0-1] ]]; then
