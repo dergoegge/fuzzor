@@ -3,10 +3,10 @@ FROM fuzzor-base:latest
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   wget \
   python3-venv \
-  gcc-13-arm-linux-gnueabihf \
-  g++-13-arm-linux-gnueabihf \
-  gcc-13-x86-64-linux-gnu \
-  g++-13-x86-64-linux-gnu
+  gcc-14-arm-linux-gnueabihf \
+  g++-14-arm-linux-gnueabihf \
+  gcc-14-x86-64-linux-gnu \
+  g++-14-x86-64-linux-gnu
 
 # Avoid gcc version incompatability caused by apt upgrade
 RUN cd /AFLplusplus && make clean && make PERFORMANCE=1 -j$(nproc) install

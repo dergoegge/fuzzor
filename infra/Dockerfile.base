@@ -24,7 +24,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   cmake \
   libz3-dev \
   linux-perf \
-  gcc-13-plugin-dev
+  gcc-14-plugin-dev
 
 #RUN git clone https://github.com/rui314/mold.git
 #RUN mkdir mold/build && cd mold/build && \

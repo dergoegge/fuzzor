@@ -3,14 +3,14 @@
 set -ex
 
 if [[ $FUZZING_ENGINE =~ semsan_Custom[0-1] ]]; then
-  export CC=arm-linux-gnueabihf-gcc-13
-  export CXX=arm-linux-gnueabihf-g++-13
-  export LD=arm-linux-gnueabihf-gcc-13
+  export CC=arm-linux-gnueabihf-gcc-14
+  export CXX=arm-linux-gnueabihf-g++-14
+  export LD=arm-linux-gnueabihf-gcc-14
   export AR=arm-linux-gnueabihf-ar
 elif [[ $FUZZING_ENGINE =~ semsan_Custom[2-3] ]]; then
-  export CC=x86_64-linux-gnu-gcc-13
-  export CXX=x86_64-linux-gnu-g++-13
-  export LD=x86_64-linux-gnu-gcc-13
+  export CC=x86_64-linux-gnu-gcc-14
+  export CXX=x86_64-linux-gnu-g++-14
+  export LD=x86_64-linux-gnu-gcc-14
   export AR=x86_64-linux-gnu-ar
 fi
 
