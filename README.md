@@ -1,6 +1,16 @@
+# Fuzzor
+
 ## Usage
 
 At the moment, fuzzor consists of two utilities: `fuzz-project` and `fuzz-prs`.
+
+`fuzz-project` can be used to continuously fuzz a single project. It monitors
+for source code changes on the configure repo and if a new revision is
+detected, it will kick of a new build and subsequent fuzzing campaigns.
+
+All harnesses are fuzzed in a round-robin fashion, unless a new revision was
+build, in which case new harnesses and the harnesses that reach the recently
+modified code are prioritized.
 
 ```
 Usage: fuzz-project [OPTIONS] --project <PROJECT>
@@ -28,6 +38,14 @@ Options:
           Print help
 ```
 
+`fuzz-prs` enables fuzzing pull requests of a given project. It tries to fuzz
+any newly introduced harnesses by a given PR, as well as harnesses that are
+able to reach the modified code.
+
+For it to work properly, all harnesses in the base project should have been
+fuzzed with `fuzz-project` (this makes sure that fuzzor has the required
+context for coverage based harness scheduling).
+
 ```
 Usage: fuzz-prs [OPTIONS] --project <PROJECT> --prs <PULL_REQUESTS>
 
@@ -48,7 +66,9 @@ Options:
           Print help
 ```
 
-### Initial setup
+### Project Integration
+
+### Required: Building the Base Image
 
 The project specific docker images (e.g. `projects/bitcoin/Docker`) all build
 on top of the `fuzzor-base` image, which can be build from the docker file in
