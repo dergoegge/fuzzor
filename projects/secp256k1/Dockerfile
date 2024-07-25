@@ -12,6 +12,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
 RUN cd /AFLplusplus && make clean && make PERFORMANCE=1 -j$(nproc) install
 
 RUN cd /semsan && cargo install --features qemu_arm --bin semsan-arm --path .
+RUN cd /semsan && cargo install --features qemu_x86_64 --bin semsan-x86_64 --path .
 
 RUN git clone https://github.com/bitcoin-core/secp256k1.git
 RUN git clone https://github.com/guidovranken/cryptofuzz.git

@@ -8,10 +8,10 @@ if [[ $FUZZING_ENGINE =~ semsan_Custom[0-1] ]]; then
   export LD=arm-linux-gnueabihf-gcc-13
   export AR=arm-linux-gnueabihf-ar
 elif [[ $FUZZING_ENGINE =~ semsan_Custom[2-3] ]]; then
-  export CC=x86-64-linux-gnu-gcc-13
-  export CXX=x86-64-linux-gnu-g++-13
-  export LD=x86-64-linux-gnu-gcc-13
-  export AR=x86-64-linux-gnu-ar
+  export CC=x86_64-linux-gnu-gcc-13
+  export CXX=x86_64-linux-gnu-g++-13
+  export LD=x86_64-linux-gnu-gcc-13
+  export AR=x86_64-linux-gnu-ar
 fi
 
 pushd secp256k1
@@ -27,7 +27,7 @@ if [[ $FUZZING_ENGINE =~ "semsan_Custom0" ]]; then
   ./configure $COMMON_CONF_OPTS $COMMON_ARM32_CONF_OPTS --with-asm=no # Disable hand-rolled assembly
 elif [[ $FUZZING_ENGINE =~ "semsan_Custom1" ]]; then
   ./configure $COMMON_CONF_OPTS $COMMON_ARM32_CONF_OPTS --with-asm=arm32 # Enable hand-rolled assembly
-if [[ $FUZZING_ENGINE =~ "semsan_Custom2" ]]; then
+elif [[ $FUZZING_ENGINE =~ "semsan_Custom2" ]]; then
   ./configure $COMMON_CONF_OPTS $COMMON_X86_CONF_OPTS --with-asm=no # Disable hand-rolled assembly
 elif [[ $FUZZING_ENGINE =~ "semsan_Custom3" ]]; then
   ./configure $COMMON_CONF_OPTS $COMMON_X86_CONF_OPTS --with-asm=x86_64 # Enable hand-rolled assembly
@@ -105,7 +105,7 @@ echo -n '"' >>extra_options.h
 export CXXFLAGS="$CXXFLAGS -DCRYPTOFUZZ_NO_OPENSSL"
 
 if [[ $FUZZING_ENGINE =~ semsan_Custom[0-5] ]]; then
-  $CXX -static ../qemu_harness.cpp -c -o qemu_harness.o
+  $CXX -DNEVER_EXIT -static ../qemu_harness.cpp -c -o qemu_harness.o
   $AR rcs qemu_harness.a qemu_harness.o
   export LIB_FUZZING_ENGINE="./qemu_harness.a"
 elif [[ $FUZZING_ENGINE =~ "aflpp" || $FUZZING_ENGINE =~ "semsan" ]]; then
