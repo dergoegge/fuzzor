@@ -4,7 +4,9 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   wget \
   python3-venv \
   gcc-13-arm-linux-gnueabihf \
-  g++-13-arm-linux-gnueabihf
+  g++-13-arm-linux-gnueabihf \
+  gcc-13-x86-64-linux-gnu \
+  g++-13-x86-64-linux-gnu
 
 # Avoid gcc version incompatability caused by apt upgrade
 RUN cd /AFLplusplus && make clean && make PERFORMANCE=1 -j$(nproc) install
@@ -23,6 +25,7 @@ COPY ./shmem.patch .
 COPY ./gcc.patch .
 COPY ./arm32.patch .
 COPY ./cpu_feartues_arm32.patch .
+COPY ./cpu_feartues_x86_64.patch .
 COPY ./qemu_harness.cpp .
 COPY ./config.yaml .
 

@@ -69,7 +69,7 @@ RUN rm -rf $(which ld) && ln -s $(which ld.lld) /usr/bin/ld
 # Clone AFLplusplus and build
 # this should come from our custom clang build?
 ENV LLVM_CONFIG=llvm-config
-# TODO switch back to stable, use libafl_cc for compiling semsan targets (to avoid forkserver breakage)
+# TODO: switch back to stable, use libafl_cc for compiling semsan targets (to avoid forkserver breakage)
 RUN git clone --branch v4.21c https://github.com/AFLplusplus/AFLplusplus
 RUN cd AFLplusplus && make PERFORMANCE=1 install -j$(nproc)
 

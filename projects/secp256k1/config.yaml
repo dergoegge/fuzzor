@@ -23,8 +23,8 @@ sanitizers:
 - !SemSan GccO2
 - !SemSan Custom0 # arm32 --with-asm=no
 - !SemSan Custom1 # arm32 --with-asm=arm32
-#- !SemSan Custom2 # x86_64 --with-asm=no 
-#- !SemSan Custom3 # x86_64 --with-asm=x86_64
+- !SemSan Custom2 # x86_64 --with-asm=no 
+- !SemSan Custom3 # x86_64 --with-asm=x86_64
 #- !SemSan Custom5 # i386
 - !SemSan Custom6 # --with-test-override-wide-multiply=int64
 - !SemSan Custom7 # --with-test-override-wide-multiply=int128

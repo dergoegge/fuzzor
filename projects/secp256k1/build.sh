@@ -7,6 +7,11 @@ if [[ $FUZZING_ENGINE =~ semsan_Custom[0-1] ]]; then
   export CXX=arm-linux-gnueabihf-g++-13
   export LD=arm-linux-gnueabihf-gcc-13
   export AR=arm-linux-gnueabihf-ar
+elif [[ $FUZZING_ENGINE =~ semsan_Custom[2-3] ]]; then
+  export CC=x86-64-linux-gnu-gcc-13
+  export CXX=x86-64-linux-gnu-g++-13
+  export LD=x86-64-linux-gnu-gcc-13
+  export AR=x86-64-linux-gnu-ar
 fi
 
 pushd secp256k1
@@ -17,10 +22,15 @@ git checkout .
 ./autogen.sh
 COMMON_CONF_OPTS="--enable-static --disable-tests --disable-benchmark --with-bignum=no --disable-exhaustive-tests --enable-module-recovery --enable-module-schnorrsig --enable-experimental --enable-module-ecdh"
 COMMON_ARM32_CONF_OPTS="--host=arm-linux-gnueabihf --with-test-override-wide-multiply=int128_struct"
+COMMON_X86_CONF_OPTS="--host=x86-64-linux-gnu"
 if [[ $FUZZING_ENGINE =~ "semsan_Custom0" ]]; then
   ./configure $COMMON_CONF_OPTS $COMMON_ARM32_CONF_OPTS --with-asm=no # Disable hand-rolled assembly
 elif [[ $FUZZING_ENGINE =~ "semsan_Custom1" ]]; then
   ./configure $COMMON_CONF_OPTS $COMMON_ARM32_CONF_OPTS --with-asm=arm32 # Enable hand-rolled assembly
+if [[ $FUZZING_ENGINE =~ "semsan_Custom2" ]]; then
+  ./configure $COMMON_CONF_OPTS $COMMON_X86_CONF_OPTS --with-asm=no # Disable hand-rolled assembly
+elif [[ $FUZZING_ENGINE =~ "semsan_Custom3" ]]; then
+  ./configure $COMMON_CONF_OPTS $COMMON_X86_CONF_OPTS --with-asm=x86_64 # Enable hand-rolled assembly
 elif [[ $FUZZING_ENGINE =~ "semsan_Custom6" ]]; then
   ./configure $COMMON_CONF_OPTS --with-test-override-wide-multiply=int64
 elif [[ $FUZZING_ENGINE =~ "semsan_Custom7" ]]; then
@@ -47,9 +57,12 @@ git checkout .
 git apply ../shmem.patch # Makes cryptofuzz write to semsan's shmem buffer
 git apply ../gcc.patch # Allows us to build cryptofuzz with gcc
 git apply ../arm32.patch
+
+# Force cpu_features to compile for the right architecure
 if [[ $FUZZING_ENGINE =~ semsan_Custom[0-1] ]]; then
-  # Force cpu_features to compile for arm32
   git apply ../cpu_feartues_arm32.patch
+elif [[ $FUZZING_ENGINE =~ semsan_Custom[2-3] ]]; then
+  git apply ../cpu_feartues_x86_64.patch
 fi
 
 export CXXFLAGS="$CXXFLAGS -Wno-psabi"
@@ -91,7 +104,7 @@ echo -n '"' >>extra_options.h
 
 export CXXFLAGS="$CXXFLAGS -DCRYPTOFUZZ_NO_OPENSSL"
 
-if [[ $FUZZING_ENGINE =~ semsan_Custom[0-1] ]]; then
+if [[ $FUZZING_ENGINE =~ semsan_Custom[0-5] ]]; then
   $CXX -static ../qemu_harness.cpp -c -o qemu_harness.o
   $AR rcs qemu_harness.a qemu_harness.o
   export LIB_FUZZING_ENGINE="./qemu_harness.a"
