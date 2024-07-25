@@ -1,7 +1,7 @@
-name: bitcoin
+name: secp256k1
 
-owner: guidovranken
-repo: cryptofuzz
+owner: bitcoin-core
+repo: secp256k1
 
 language: Cpp
 ccs:

@@ -14,7 +14,13 @@ RUN cd /AFLplusplus && make clean && make PERFORMANCE=1 -j$(nproc) install
 RUN cd /semsan && cargo install --features qemu_arm --bin semsan-arm --path .
 RUN cd /semsan && cargo install --features qemu_x86_64 --bin semsan-x86_64 --path .
 
-RUN git clone https://github.com/bitcoin-core/secp256k1.git
+
+ARG OWNER=bitcoin-core
+ARG REPO=secp256k1
+ARG BRANCH=master
+ARG REVISION=
+
+RUN git clone --depth 1 --branch $BRANCH https://github.com/$OWNER/$REPO.git
 RUN git clone https://github.com/guidovranken/cryptofuzz.git
 RUN wget https://archives.boost.io/release/1.84.0/source/boost_1_84_0.tar.bz2
 
