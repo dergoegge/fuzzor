@@ -116,7 +116,38 @@ impl Fuzzer for SemSanFuzzer {
             dummy_input.write_all(b"AAA").unwrap();
         }
 
-        let mut command = tokio::process::Command::new("semsan");
+        // TODO make this async
+        let file_info = std::process::Command::new("file")
+            .arg(&self.secondary_binary)
+            .output()
+            .unwrap()
+            .stdout;
+
+        let info: Vec<&str> = unsafe {
+            std::str::from_utf8_unchecked(&file_info)
+                .split(",")
+                .collect()
+        };
+        assert!(info.len() > 2);
+
+        #[cfg(target_arch = "x86_64")]
+        let x86_64_bin = "semsan";
+        #[cfg(not(target_arch = "x86_64"))]
+        let x86_64_bin = "semsan-x86_64"; // emulate x86_64
+        #[cfg(target_arch = "aarch64")]
+        let aarch64_bin = "semsan";
+        #[cfg(not(target_arch = "aarch64"))]
+        let aarch64_bin = "semsan-aarch64"; // emulate aarch64
+
+        // TODO detect host
+        let semsan_binary = match info[1] {
+            " ARM" => "semsan-arm",
+            " x86-64" => x86_64_bin,
+            " ARM aarch64" => aarch64_bin,
+            _ => "semsan",
+        };
+
+        let mut command = tokio::process::Command::new(semsan_binary);
         command.args(&["--comparator", &self.comparator, "--timeout", "5000"]);
         command.args(&[&self.primary_binary, &self.secondary_binary]);
         command.args(&[
