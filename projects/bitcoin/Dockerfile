@@ -15,7 +15,6 @@ RUN mv ./bitcoin/test/sanitizer_suppressions/ubsan ./ubsan_suppressions
 RUN echo "unsigned-integer-overflow:secp256k1_*" >> ./ubsan_suppressions
 
 COPY ./config.yaml .
-COPY ./cov.patch .
 COPY ./build.sh .
 
 RUN --mount=type=cache,target=/ccache/ \
