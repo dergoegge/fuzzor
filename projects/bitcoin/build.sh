@@ -9,22 +9,14 @@ pushd bitcoin
 rm -rf ./*
 git checkout .
 
-# Try applying the coverage counter reset patch. The patch makes our estimation
-# of which harnesses to fuzz for a given code diff more accurate.
-git apply ../cov.patch || true
-
 # Restore the depends download
 cp -r ../bitcoin_depends_sources ./depends/sources
 
 # Build dependencies using the Bitcoin Core depends system.
-pushd depends
-
-sed -i --regexp-extended '/.*rm -rf .*extract_dir.*/d' ./funcs.mk  # Keep extracted source
-make DEBUG=1 NO_QT=1 NO_BDB=1 NO_ZMQ=1 NO_UPNP=1 NO_NATPMP=1 NO_USDT=1 \
+sed -i --regexp-extended '/.*rm -rf .*extract_dir.*/d' ./depends/funcs.mk  # Keep extracted source
+make -C depends DEBUG=1 NO_QT=1 NO_BDB=1 NO_ZMQ=1 NO_UPNP=1 NO_NATPMP=1 NO_USDT=1 \
      AR=llvm-ar NM=llvm-nm RANLIB=llvm-ranlib STRIP=llvm-strip \
      CPPFLAGS="$CPPFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" -j$(nproc)
-
-popd
 
 ./autogen.sh
 
