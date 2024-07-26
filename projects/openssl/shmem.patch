@@ -31,7 +31,7 @@ index 554c6c2..9dd1e22 100644
      driver = std::make_shared<cryptofuzz::Driver>(options);
      cryptofuzz_options = driver->GetOptionsPtr();
 diff --git a/executor.cpp b/executor.cpp
-index 86128f5..41596da 100644
+index 86128f5..28e02a1 100644
 --- a/executor.cpp
 +++ b/executor.cpp
 @@ -3,6 +3,7 @@
@@ -42,27 +42,27 @@ index 86128f5..41596da 100644
  #include <fuzzing/memory.hpp>
  #include <algorithm>
  #include <set>
-@@ -2836,6 +2837,32 @@ void ExecutorBase<ResultType, OperationType>::Run(Datasource& parentDs, const ui
-     if ( options.noCompare == false ) {
-         compare(operations, results, data, size);
-     }
-+
-+    if (options.characterization_shmem != nullptr) {
+@@ -2486,6 +2487,34 @@ bool ExecutorBase<component::MAC, operation::HMAC>::dontCompare(const operation:
+ 
+ template <class ResultType, class OperationType>
+ void ExecutorBase<ResultType, OperationType>::compare(const std::vector< std::pair<std::shared_ptr<Module>, OperationType> >& operations, const ResultSet& results, const uint8_t* data, const size_t size) const {
++    if (options.characterization_shmem != nullptr && !operations.empty() &&
++        dontCompare(operations[0].second) == false) {
 +        // Use the sha1 hash of all the result values as the characterization
 +        // value.
 +        Datasource out{nullptr, 0};
 +        for (auto res : results) {
 +            if (const std::optional<ResultType> value = res.second) {
 +                if constexpr (std::is_same_v<ResultType, bool>) {
-+                    out.Put<bool>(*value);
++                        out.Put<bool>(*value);
 +                } else if constexpr (std::is_same_v<
 +                                         ResultType,
 +                                         std::array<cryptofuzz::Buffer, 3>>) {
-+                    (*value)[0].Serialize(out);
-+                    (*value)[1].Serialize(out);
-+                    (*value)[2].Serialize(out);
++                        (*value)[0].Serialize(out);
++                        (*value)[1].Serialize(out);
++                        (*value)[2].Serialize(out);
 +                } else {
-+                    value->Serialize(out);
++                        value->Serialize(out);
 +                }
 +            }
 +        }
@@ -71,10 +71,12 @@ index 86128f5..41596da 100644
 +        auto hash = crypto::sha1(output);
 +        assert(hash.size() <= 32);
 +        memcpy(options.characterization_shmem, hash.data(), hash.size());
++        return;
 +    }
- }
- 
- /* Explicit template instantiation */
++
+     if ( results.size() < 2 ) {
+         /* Nothing to compare. Don't even bother filtering. */
+         return;
 diff --git a/include/cryptofuzz/options.h b/include/cryptofuzz/options.h
 index c7a0ecf..305010a 100644
 --- a/include/cryptofuzz/options.h
