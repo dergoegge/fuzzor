@@ -174,7 +174,7 @@ pub fn get_harness_dir(
         (FuzzEngine::AflPlusPlus, Sanitizer::ValueProfile) => None,
         (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(t)) => Some(format!("semsan_{:?}", t)),
 
-        (FuzzEngine::SemSan, Sanitizer::None) => Some(String::from("aflpp")),
+        (FuzzEngine::SemSan, Sanitizer::None) => Some(String::from("semsan")),
         (FuzzEngine::SemSan, Sanitizer::Undefined) => None,
         (FuzzEngine::SemSan, Sanitizer::Address) => None,
         (FuzzEngine::SemSan, Sanitizer::Coverage) => None,

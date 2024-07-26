@@ -99,6 +99,12 @@ async fn build_cpp(
             ld: AFL_CLANG_CC,
             envs: &[],
         },
+        (FuzzEngine::SemSan, Sanitizer::None) => BuildEnv {
+            cc: AFL_CLANG_CC,
+            cxx: AFL_CLANG_CXX,
+            ld: AFL_CLANG_CC,
+            envs: &[],
+        },
         (FuzzEngine::AflPlusPlus, Sanitizer::None) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
