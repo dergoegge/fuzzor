@@ -57,43 +57,43 @@ async fn build_cpp(
     config: &ProjectConfig,
 ) -> Result<(), std::io::Error> {
     let env = match (engine, sanitizer) {
-        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(SemSanBuild::GccO0)) => BuildEnv {
+        (FuzzEngine::SemSan, Sanitizer::SemSan(SemSanBuild::GccO0)) => BuildEnv {
             cc: AFL_GCC_CC,
             cxx: AFL_GCC_CXX,
             ld: AFL_GCC_CC,
             envs: &[("CFLAGS", "-O0"), ("CXXFLAGS", "-O0")],
         },
-        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(SemSanBuild::GccO1)) => BuildEnv {
+        (FuzzEngine::SemSan, Sanitizer::SemSan(SemSanBuild::GccO1)) => BuildEnv {
             cc: AFL_GCC_CC,
             cxx: AFL_GCC_CXX,
             ld: AFL_GCC_CC,
             envs: &[("CFLAGS", "-O1"), ("CXXFLAGS", "-O1")],
         },
-        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(SemSanBuild::GccO2)) => BuildEnv {
+        (FuzzEngine::SemSan, Sanitizer::SemSan(SemSanBuild::GccO2)) => BuildEnv {
             cc: AFL_GCC_CC,
             cxx: AFL_GCC_CXX,
             ld: AFL_GCC_CC,
             envs: &[("CFLAGS", "-O2"), ("CXXFLAGS", "-O2")],
         },
-        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(SemSanBuild::ClangO0)) => BuildEnv {
+        (FuzzEngine::SemSan, Sanitizer::SemSan(SemSanBuild::ClangO0)) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
             ld: AFL_CLANG_CC,
             envs: &[("CFLAGS", "-O0"), ("CXXFLAGS", "-O0")],
         },
-        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(SemSanBuild::ClangO1)) => BuildEnv {
+        (FuzzEngine::SemSan, Sanitizer::SemSan(SemSanBuild::ClangO1)) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
             ld: AFL_CLANG_CC,
             envs: &[("CFLAGS", "-O1"), ("CXXFLAGS", "-O1")],
         },
-        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(SemSanBuild::ClangO2)) => BuildEnv {
+        (FuzzEngine::SemSan, Sanitizer::SemSan(SemSanBuild::ClangO2)) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
             ld: AFL_CLANG_CC,
             envs: &[("CFLAGS", "-O2"), ("CXXFLAGS", "-O2")],
         },
-        (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(_)) => BuildEnv {
+        (FuzzEngine::SemSan, Sanitizer::SemSan(_)) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
             ld: AFL_CLANG_CC,
@@ -195,7 +195,7 @@ async fn build_cpp(
     let mut envs = env.envs();
     envs.insert("FUZZING_ENGINE", &harness_dir);
 
-    let semsan_type = if let (FuzzEngine::AflPlusPlus, Sanitizer::SemSan(t)) = (engine, sanitizer) {
+    let semsan_type = if let (FuzzEngine::SemSan, Sanitizer::SemSan(t)) = (engine, sanitizer) {
         Some(format!("{:?}", t))
     } else {
         None
