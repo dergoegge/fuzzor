@@ -66,6 +66,22 @@ async fn main() -> Result<(), std::io::Error> {
     let mut supported_fuzzers = Vec::new();
 
     let mut cores_assigned = 0;
+
+    if config.has_engine(&FuzzEngine::SemSan) && num_cpus::get() > cores_assigned {
+        if let Some(sanitizers) = &config.sanitizers {
+            supported_fuzzers.push((FuzzEngine::SemSan, Sanitizer::None));
+            for sanitizer in sanitizers.iter() {
+                if matches!(sanitizer, &Sanitizer::SemSan(_))
+                    && config.has_sanitizer(sanitizer)
+                    && num_cpus::get() > cores_assigned
+                {
+                    supported_fuzzers.push((FuzzEngine::SemSan, sanitizer.clone()));
+                    cores_assigned += 1;
+                }
+            }
+        }
+    }
+
     if config.has_engine(&FuzzEngine::LibFuzzer) && num_cpus::get() > cores_assigned {
         supported_fuzzers.push((FuzzEngine::LibFuzzer, Sanitizer::None));
         cores_assigned += 1;
@@ -106,21 +122,6 @@ async fn main() -> Result<(), std::io::Error> {
 
         // Occupy left over cores with afl++ instances
         command.arg("--aflpp-occupy");
-    }
-
-    if config.has_engine(&FuzzEngine::SemSan) && num_cpus::get() > cores_assigned {
-        if let Some(sanitizers) = &config.sanitizers {
-            supported_fuzzers.push((FuzzEngine::SemSan, Sanitizer::None));
-            for sanitizer in sanitizers.iter() {
-                if matches!(sanitizer, &Sanitizer::SemSan(_))
-                    && config.has_sanitizer(sanitizer)
-                    && num_cpus::get() > cores_assigned
-                {
-                    supported_fuzzers.push((FuzzEngine::SemSan, sanitizer.clone()));
-                    cores_assigned += 1;
-                }
-            }
-        }
     }
 
     for (engine, sanitizer) in supported_fuzzers.iter() {
