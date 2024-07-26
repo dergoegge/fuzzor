@@ -1,0 +1,25 @@
+name: openssl
+
+owner: openssl
+repo: openssl
+
+language: C
+ccs:
+- dergoegge
+
+engines:
+- LibFuzzer
+- SemSan
+- None
+sanitizers:
+- ValueProfile
+- None
+- !SemSan ClangO0
+- !SemSan ClangO1 # skip clang -O2 (that's the default with afl-clang-fast)
+- !SemSan GccO0
+- !SemSan GccO1
+- !SemSan GccO2
+- !SemSan Custom0 # arm32
+- !SemSan Custom1 # x86_64
+#- !SemSan Custom5 # i386
+# TODO: more arches ppc{32,64}, riscv{32,64}

@@ -1,0 +1,89 @@
+diff --git a/entry.cpp b/entry.cpp
+index 554c6c2..9dd1e22 100644
+--- a/entry.cpp
++++ b/entry.cpp
+@@ -4,6 +4,8 @@
+ #include <set>
+ #include <vector>
+ #include <string>
++#include <sys/shm.h>
++#include <unistd.h>
+ #include <cryptofuzz/options.h>
+ #include <fuzzing/datasource/id.hpp>
+ #include "repository_tbl.h"
+@@ -462,7 +464,17 @@ static void setOptions(int argc, char** argv) {
+     );
+     boost::split(extraArguments, cmdline, boost::is_any_of(" "));
+ 
+-    const cryptofuzz::Options options(argc, argv, extraArguments);
++    cryptofuzz::Options options(argc, argv, extraArguments);
++
++    if (const char *shmem_id =
++            std::getenv("SEMSAN_CHARACTERIZATION_SHMEM_ID")) {
++      options.characterization_shmem =
++          (uint8_t *)shmat(std::stoi(shmem_id), NULL, 0);
++      assert(options.characterization_shmem);
++      memset(options.characterization_shmem, 0, 32);
++    } else {
++      options.characterization_shmem = nullptr;
++    }
+ 
+     driver = std::make_shared<cryptofuzz::Driver>(options);
+     cryptofuzz_options = driver->GetOptionsPtr();
+diff --git a/executor.cpp b/executor.cpp
+index 86128f5..41596da 100644
+--- a/executor.cpp
++++ b/executor.cpp
+@@ -3,6 +3,7 @@
+ #include "mutatorpool.h"
+ #include "config.h"
+ #include <cryptofuzz/util.h>
++#include <cryptofuzz/crypto.h>
+ #include <fuzzing/memory.hpp>
+ #include <algorithm>
+ #include <set>
+@@ -2836,6 +2837,32 @@ void ExecutorBase<ResultType, OperationType>::Run(Datasource& parentDs, const ui
+     if ( options.noCompare == false ) {
+         compare(operations, results, data, size);
+     }
++
++    if (options.characterization_shmem != nullptr) {
++        // Use the sha1 hash of all the result values as the characterization
++        // value.
++        Datasource out{nullptr, 0};
++        for (auto res : results) {
++            if (const std::optional<ResultType> value = res.second) {
++                if constexpr (std::is_same_v<ResultType, bool>) {
++                    out.Put<bool>(*value);
++                } else if constexpr (std::is_same_v<
++                                         ResultType,
++                                         std::array<cryptofuzz::Buffer, 3>>) {
++                    (*value)[0].Serialize(out);
++                    (*value)[1].Serialize(out);
++                    (*value)[2].Serialize(out);
++                } else {
++                    value->Serialize(out);
++                }
++            }
++        }
++
++        std::vector<uint8_t> output = out.GetOut();
++        auto hash = crypto::sha1(output);
++        assert(hash.size() <= 32);
++        memcpy(options.characterization_shmem, hash.data(), hash.size());
++    }
+ }
+ 
+ /* Explicit template instantiation */
+diff --git a/include/cryptofuzz/options.h b/include/cryptofuzz/options.h
+index c7a0ecf..305010a 100644
+--- a/include/cryptofuzz/options.h
++++ b/include/cryptofuzz/options.h
+@@ -35,6 +35,7 @@ class Options {
+         bool disableTests = false;
+         bool noDecrypt = false;
+         bool noCompare = false;
++        uint8_t *characterization_shmem = nullptr;
+ };
+ 
+ } /* namespace cryptofuzz */
