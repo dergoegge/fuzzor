@@ -14,7 +14,6 @@ RUN cd /AFLplusplus && make clean && make PERFORMANCE=1 -j$(nproc) install
 RUN cd /semsan && cargo install --features qemu_arm --bin semsan-arm --path .
 RUN cd /semsan && cargo install --features qemu_x86_64 --bin semsan-x86_64 --path .
 
-
 ARG OWNER=bitcoin-core
 ARG REPO=secp256k1
 ARG BRANCH=master

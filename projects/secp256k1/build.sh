@@ -127,4 +127,4 @@ make -j$(nproc)
 
 cp cryptofuzz $OUT/
 
-popd # secp256k1
+popd # cryptofuzz
