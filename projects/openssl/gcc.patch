@@ -1,0 +1,73 @@
+diff --git a/modules/secp256k1/module.cpp b/modules/secp256k1/module.cpp
+index 5e0c945..7cd188c 100644
+--- a/modules/secp256k1/module.cpp
++++ b/modules/secp256k1/module.cpp
+@@ -131,7 +131,7 @@ end:
+                                 CheckRet(secp256k1_context_randomize(ctx, seed.data())) == 1,
+                                 "Call to secp256k1_context_randomize failed");
+                     }
+-                } catch ( fuzzing::datasource::Datasource::OutOfData ) { }
++                } catch ( fuzzing::datasource::Datasource::OutOfData& ) { }
+ #endif
+             }
+ 
+@@ -162,7 +162,7 @@ end:
+                     if ( ds.Get<bool>() ) {
+                         clone();
+                     }
+-                } catch ( fuzzing::datasource::Datasource::OutOfData ) { }
++                } catch ( fuzzing::datasource::Datasource::OutOfData& ) { }
+ 
+                 return ctx;
+             }
+@@ -226,7 +226,7 @@ end:
+                         if ( ds.Get<bool>() ) {
+                             convert();
+                         }
+-                    } catch ( fuzzing::datasource::Datasource::OutOfData ) { }
++                    } catch ( fuzzing::datasource::Datasource::OutOfData& ) { }
+                 }
+                 return sig;
+             }
+@@ -299,7 +299,7 @@ end:
+                             }
+                         }
+                     }
+-                } catch ( fuzzing::datasource::Datasource::OutOfData ) { }
++                } catch ( fuzzing::datasource::Datasource::OutOfData& ) { }
+ 
+                 if ( original_size > 0 ) {
+                     util::free(data);
+@@ -326,7 +326,7 @@ end:
+                         if ( ds.Get<bool>() ) {
+                             serialize();
+                         }
+-                    } catch ( fuzzing::datasource::Datasource::OutOfData ) { }
++                    } catch ( fuzzing::datasource::Datasource::OutOfData& ) { }
+                 }
+                 return pub;
+             }
+@@ -473,7 +473,7 @@ end:
+                         if ( ds.Get<bool>() ) {
+                             serializeCompact();
+                         }
+-                    } catch ( fuzzing::datasource::Datasource::OutOfData ) { }
++                    } catch ( fuzzing::datasource::Datasource::OutOfData& ) { }
+                 }
+                 return sig;
+             }
+diff --git a/third_party/json/json.hpp b/third_party/json/json.hpp
+index 2a32a82..8fa1a8b 100644
+--- a/third_party/json/json.hpp
++++ b/third_party/json/json.hpp
+@@ -8379,7 +8379,10 @@ scan_number_done:
+         std::string result;
+         for (const auto c : token_string)
+         {
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wtype-limits"
+             if ('\x00' <= c and c <= '\x1F')
++#pragma GCC diagnostic pop
+             {
+                 // escape control characters
+                 std::array<char, 9> cs{{}};
