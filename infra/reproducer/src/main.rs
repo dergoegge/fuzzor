@@ -161,7 +161,38 @@ async fn reproduce_differential_solution(
         std::env::temp_dir().join(Alphanumeric.sample_string(&mut rand::thread_rng(), 16));
     let stderr = std::fs::File::create(&stderr_path)?;
 
-    let mut semsan_cmd = tokio::process::Command::new("semsan");
+    // TODO make this async
+    let file_info = std::process::Command::new("file")
+        .arg(&secondary)
+        .output()
+        .unwrap()
+        .stdout;
+
+    let info: Vec<&str> = unsafe {
+        std::str::from_utf8_unchecked(&file_info)
+            .split(",")
+            .collect()
+    };
+    assert!(info.len() > 2);
+
+    #[cfg(target_arch = "x86_64")]
+    let x86_64_bin = "semsan";
+    #[cfg(not(target_arch = "x86_64"))]
+    let x86_64_bin = "semsan-x86_64"; // emulate x86_64
+    #[cfg(target_arch = "aarch64")]
+    let aarch64_bin = "semsan";
+    #[cfg(not(target_arch = "aarch64"))]
+    let aarch64_bin = "semsan-aarch64"; // emulate aarch64
+
+    // TODO detect host
+    let semsan_binary = match info[1] {
+        " ARM" => "semsan-arm",
+        " x86-64" => x86_64_bin,
+        " ARM aarch64" => aarch64_bin,
+        _ => "semsan",
+    };
+
+    let mut semsan_cmd = tokio::process::Command::new(semsan_binary);
     // TODO semsan comparator
     semsan_cmd.args(&["--timeout", "5000"]);
     semsan_cmd.args(&["--solution-exit-code", "71"]);
