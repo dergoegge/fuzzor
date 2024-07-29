@@ -20,7 +20,7 @@ rm -rf ./*
 git checkout .
 
 ./autogen.sh
-COMMON_CONF_OPTS="--enable-static --disable-tests --disable-benchmark --with-bignum=no --disable-exhaustive-tests --enable-module-recovery --enable-module-schnorrsig --enable-experimental --enable-module-ecdh"
+COMMON_CONF_OPTS="--enable-static --disable-tests --disable-benchmark --disable-exhaustive-tests --enable-module-recovery --enable-module-schnorrsig --enable-experimental --enable-module-ecdh"
 COMMON_ARM32_CONF_OPTS="--host=arm-linux-gnueabihf --with-test-override-wide-multiply=int128_struct"
 COMMON_X86_CONF_OPTS="--host=x86-64-linux-gnu"
 if [[ $FUZZING_ENGINE =~ "semsan_Custom0" ]]; then
