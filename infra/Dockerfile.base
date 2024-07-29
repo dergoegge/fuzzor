@@ -133,6 +133,8 @@ WORKDIR /
 RUN git clone https://github.com/dergoegge/semsan.git
 RUN cd semsan && cargo install --path . --verbose
 
+COPY ./toolchains toolchains
+
 WORKDIR /workdir
 RUN mkdir --parents workspace/corpus
 RUN mkdir --parents workspace/min_corpus

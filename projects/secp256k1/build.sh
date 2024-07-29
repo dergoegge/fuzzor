@@ -7,11 +7,13 @@ if [[ $FUZZING_ENGINE =~ semsan_Custom[0-1] ]]; then
   export CXX=arm-linux-gnueabihf-g++-14
   export LD=arm-linux-gnueabihf-gcc-14
   export AR=arm-linux-gnueabihf-ar
+  export CMAKE_TOOLCHAIN_FILE=/toolchains/arm32.cmake
 elif [[ $FUZZING_ENGINE =~ semsan_Custom[2-3] ]]; then
   export CC=x86_64-linux-gnu-gcc-14
   export CXX=x86_64-linux-gnu-g++-14
   export LD=x86_64-linux-gnu-gcc-14
   export AR=x86_64-linux-gnu-ar
+  export CMAKE_TOOLCHAIN_FILE=/toolchains/x86_64.cmake
 fi
 
 pushd secp256k1
@@ -56,13 +58,6 @@ git checkout .
 
 git apply ../shmem.patch # Makes cryptofuzz write to semsan's shmem buffer
 git apply ../gcc.patch # Allows us to build cryptofuzz with gcc
-
-# Force cpu_features to compile for the right architecure
-if [[ $FUZZING_ENGINE =~ semsan_Custom[0-1] ]]; then
-  git apply ../cpu_feartues_arm32.patch
-elif [[ $FUZZING_ENGINE =~ semsan_Custom[2-3] ]]; then
-  git apply ../cpu_feartues_x86_64.patch
-fi
 
 export CXXFLAGS="$CXXFLAGS -Wno-psabi"
 
