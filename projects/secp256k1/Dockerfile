@@ -29,8 +29,6 @@ RUN bash ./build_boost.sh # build and install boost
 COPY ./build.sh .
 COPY ./shmem.patch .
 COPY ./gcc.patch .
-COPY ./cpu_feartues_arm32.patch .
-COPY ./cpu_feartues_x86_64.patch .
 COPY ./qemu_harness.cpp .
 COPY ./config.yaml .
 
