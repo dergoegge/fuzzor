@@ -35,16 +35,15 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
 RUN git clone --depth 1 --branch "llvmorg-18.1.8" https://github.com/llvm/llvm-project.git
 
 # Build clang and runtimes
-RUN mkdir clang_build && \
-  cmake -G Ninja -B clang_build/ \
+RUN cmake -G Ninja -B /llvm-project/build/ \
     -DLLVM_ENABLE_PROJECTS="clang;lld" \
     -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_BINUTILS_INCDIR=/usr/include \
     -DLLVM_TARGETS_TO_BUILD=Native \
     -DLLVM_ENABLE_RUNTIMES="compiler-rt;libcxx;libcxxabi;libunwind" \
     -S /llvm-project/llvm \
-  && ninja -C clang_build/ "-j$(nproc)" \
-  && ninja -C clang_build/ install
+  && ninja -C /llvm-project/build/ "-j$(nproc)" install \
+  && rm -rf /llvm-project
 
 # TODO: This fixes weird compile issues. Why?
 RUN rm -rf $(which ld) && ln -s $(which ld.lld) /usr/bin/ld 
