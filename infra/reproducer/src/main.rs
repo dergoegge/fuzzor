@@ -110,17 +110,14 @@ async fn reproduce_crashes_and_timeouts(
         .status()
         .await?;
 
-    if let Some(code) = status.code() {
+    if !status.success() {
+        let code = status.code().unwrap_or(66); // 66: probably a signal kill
         let file_name = test_case.file_name().unwrap().to_str().unwrap();
 
         // Create a flamegraph for timeouts and read the stack trace from stdout/stderr for crashes.
         let trace = match code {
             78 => create_flame_graph_for_input(binary, test_case.clone()).await?,
-            75..=77 => tokio::fs::read(&tmp_file).await?,
-            _ => {
-                tokio::fs::remove_file(&tmp_file).await?;
-                return Ok(None);
-            }
+            _ => tokio::fs::read(&tmp_file).await?,
         };
 
         let reproduced_solution = std::fs::File::create(output_dir.join(file_name))?;

@@ -132,6 +132,7 @@ pub struct ReproducedSolution {
     ///   - 75: ASan crash
     ///   - 76: UBSan crash
     ///   - 77: Regular crash (e.g. due to an assertion)
+    ///   - 66: Signal crash (could be one of the sanitizers)
     ///   - 78: Timeout
     pub code: i32,
     /// Bytes of the input that trigger the solution
