@@ -61,7 +61,7 @@ impl ProjectMonitor for PullRequestMonitor {
 
     async fn monitor_project_event(&mut self, _project: String, event: ProjectEvent) {
         log::trace!("New project event: {:?}", &event);
-        if self.pr_manager.is_some() {
+        if self.pr_manager.is_none() {
             return;
         }
 
