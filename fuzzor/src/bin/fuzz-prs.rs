@@ -206,6 +206,10 @@ impl PullRequestManager {
                 .send()
                 .await
             {
+                if result.items.is_empty() {
+                    break;
+                }
+
                 log::trace!("Fetched pr page {} with {} prs", page, result.items.len());
 
                 for pr in result.items.iter() {
