@@ -385,6 +385,7 @@ where
             );
 
             if self.ignore_first_revision {
+                log::info!("Ignoring first revision for project '{}'", config.name);
                 self.ignore_first_revision = false;
                 continue;
             }

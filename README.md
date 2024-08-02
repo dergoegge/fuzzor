@@ -38,30 +38,31 @@ Options:
           Print help
 ```
 
-`fuzz-prs` enables fuzzing pull requests of a given project. It tries to fuzz
-any newly introduced harnesses by a given PR, as well as harnesses that are
-able to reach the modified code.
+`fuzz-prs` enables fuzzing of all pull requests of a given project. It tries to
+fuzz any newly introduced harnesses by a given PR, as well as harnesses that
+are able to reach the modified code.
 
 For it to work properly, all harnesses in the base project should have been
 fuzzed with `fuzz-project` (this makes sure that fuzzor has the required
 context for coverage based harness scheduling).
 
+On launch, `fuzz-prs` will fetch all PRs from the repository but it will only
+start fuzzing individual PRs one their next force-push.
+
 ```
-Usage: fuzz-prs [OPTIONS] --project <PROJECT> --prs <PULL_REQUESTS>
+Usage: fuzz-prs [OPTIONS] --project <PROJECT>
 
 Options:
       --project <PROJECT>
           Project to fuzz
-      --prs <PULL_REQUESTS>
-          Specify the list of PRs to fuzz
       --cores-per-build <CORES_PER_BUILD>
-          Number of cores to use for builds [default: 16]
+          Number of cores to use for builds [default: 8]
       --cores-per-campaign <CORES_PER_CAMPAIGN>
-          Number of cores to use for each campaign [default: 16]
+          Number of cores to use for each campaign [default: 8]
       --campaign-duration <CAMPAIGN_DURATION>
-          Campaign duration in CPU hours [default: 16]
+          Campaign duration in CPU hours [default: 8]
       --base-campaign-duration <BASE_CAMPAIGN_DURATION>
-          Campaign duration in CPU hours for the base project [default: 16]
+          Campaign duration in CPU hours for the base project [default: 8]
   -h, --help
           Print help
 ```

@@ -33,6 +33,8 @@ pub struct GitHubRevisionTracker {
 
     pub pr: Option<GitHubPullRequest>,
 
+    pub track_interval: Option<u64>,
+
     github: octocrab::Octocrab,
 }
 
@@ -70,6 +72,7 @@ impl GitHubRevisionTracker {
             repo,
             branch,
             pr: None,
+            track_interval: None,
 
             github,
         }
@@ -80,6 +83,7 @@ impl GitHubRevisionTracker {
         base_repo: String,
         pr_num: u64,
         access_token: String,
+        track_interval: Option<u64>,
     ) -> Option<Self> {
         let github = octocrab::Octocrab::builder()
             .personal_token(access_token)
@@ -106,6 +110,7 @@ impl GitHubRevisionTracker {
                     base_owner,
                     base_repo,
                 }),
+                track_interval,
                 github,
             });
         }
@@ -231,7 +236,10 @@ impl ProjectRevisionTracker<GitHubRevision> for GitHubRevisionTracker {
                     val.parse()
                         .expect("FUZZOR_GH_TRACK_INTERVAL should be a value in seconds")
                 });
-            time::sleep(time::Duration::from_secs(interval)).await;
+            time::sleep(time::Duration::from_secs(
+                self.track_interval.unwrap_or(interval),
+            ))
+            .await;
         }
     }
 }

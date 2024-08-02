@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use fuzzor::corpora::VersionedOverwritingHerder;
@@ -15,6 +15,7 @@ use fuzzor::project::{
     Project, ProjectEvent, ProjectOptions,
 };
 use fuzzor::solutions::reporter::GitHubRepoSolutionReporter;
+use fuzzor_infra::FuzzEngine;
 
 use clap::Parser;
 use octocrab::Octocrab;
@@ -25,47 +26,64 @@ struct Options {
     project: String,
 
     #[arg(
-        long = "prs",
-        help = "Specify the list of PRs to fuzz",
-        value_delimiter = ',',
-        required = true
-    )]
-    pull_requests: Vec<u64>,
-
-    #[arg(
         long = "cores-per-build",
         help = "Number of cores to use for builds",
-        default_value_t = 16
+        default_value_t = 8
     )]
     cores_per_build: u64,
     #[arg(
         long = "cores-per-campaign",
         help = "Number of cores to use for each campaign",
-        default_value_t = 16
+        default_value_t = 8
     )]
     cores_per_campaign: u64,
     #[arg(
         long = "campaign-duration",
         help = "Campaign duration in CPU hours",
-        default_value_t = 16
+        default_value_t = 8
     )]
     campaign_duration: u64,
     #[arg(
         long = "base-campaign-duration",
         help = "Campaign duration in CPU hours for the base project",
-        default_value_t = 16
+        default_value_t = 8
     )]
     base_campaign_duration: u64,
 }
 
+struct PullRequestMonitor {
+    pr_manager: Option<PullRequestManager>,
+}
+
+#[async_trait::async_trait]
+impl ProjectMonitor for PullRequestMonitor {
+    async fn monitor_campaign_event(&mut self, _project: String, _event: CampaignEvent) {}
+
+    async fn monitor_project_event(&mut self, _project: String, event: ProjectEvent) {
+        if self.pr_manager.is_some() {
+            return;
+        }
+
+        if let ProjectEvent::NewBuild = event {
+            let mut pr_manager = self.pr_manager.take().unwrap();
+            tokio::spawn(async move {
+                pr_manager.create_pr_projects().await;
+            });
+        }
+    }
+}
+
 struct PullRequestManager {
     cores: Cores,
+    github: octocrab::Octocrab,
     allocator: DockerEnvAllocator,
     parent_folder: InMemoryProjectFolder,
     parent_harnesses: SharedHarnessMap,
     opts: Options,
     projects_created: bool,
     access_token: String,
+
+    already_fuzzing: HashSet<u64>,
 }
 
 unsafe impl Send for PullRequestManager {}
@@ -80,6 +98,10 @@ impl PullRequestManager {
         access_token: &str,
     ) -> Self {
         Self {
+            github: Octocrab::builder()
+                .personal_token(access_token.to_string())
+                .build()
+                .unwrap(),
             allocator,
             parent_folder,
             opts,
@@ -87,106 +109,156 @@ impl PullRequestManager {
             parent_harnesses,
             cores,
             access_token: access_token.to_string(),
+            already_fuzzing: HashSet::new(),
         }
     }
 
-    async fn create_pr_projects(&mut self) {
-        for pr_num in self.opts.pull_requests.iter() {
-            let parent_config = self.parent_folder.config();
+    async fn create_pr_project(&mut self, pr_num: u64, gh_tracker: GitHubRevisionTracker) {
+        let parent_config = self.parent_folder.config();
 
-            if let Some(gh_tracker) = GitHubRevisionTracker::from_pull_request(
-                parent_config.repo.clone(),
-                parent_config.owner.clone(),
-                *pr_num,
-                self.access_token.clone(),
-            )
-            .await
-            {
-                log::info!(
-                    "Creating project for {} PR #{} (author={} branch={})",
-                    &parent_config.name,
-                    pr_num,
-                    &gh_tracker.owner,
-                    &gh_tracker.branch
-                );
+        log::info!(
+            "Creating project for {} PR #{} (author={} branch={})",
+            &parent_config.name,
+            pr_num,
+            &gh_tracker.owner,
+            &gh_tracker.branch
+        );
 
-                let mut folder = self.parent_folder.clone();
-                folder.config_mut().owner = gh_tracker.owner.clone();
-                folder.config_mut().repo = gh_tracker.repo.clone();
-                folder.config_mut().branch = Some(gh_tracker.branch.clone());
-                folder.config_mut().name = format!("{}-pr{}", folder.config_mut().name, pr_num);
-                let config = folder.config();
+        let mut folder = self.parent_folder.clone();
+        folder.config_mut().owner = gh_tracker.owner.clone();
+        folder.config_mut().repo = gh_tracker.repo.clone();
+        if !folder.config_mut().has_engine(&FuzzEngine::LibFuzzer) {
+            panic!("Project needs to support LibFuzzer for PR fuzzing!");
+            // TODO don't panic, recover gracefully
+        }
+        // Only use LibFuzzer and "None" to reduce build times
+        folder.config_mut().engines = Some(vec![FuzzEngine::LibFuzzer, FuzzEngine::None]);
 
-                let scheduler = Box::new(CoverageBasedScheduler::new(
-                    folder.config(),
-                    self.opts.cores_per_campaign,
-                    self.opts.campaign_duration,
-                    self.parent_harnesses.clone(),
-                ));
+        folder.config_mut().branch = Some(gh_tracker.branch.clone());
+        folder.config_mut().name = format!("{}-pr{}", folder.config_mut().name, pr_num);
+        let config = folder.config();
 
-                let state_location = homedir::get_my_home()
-                    .unwrap()
-                    .unwrap()
-                    .join(".fuzzor")
-                    .join(folder.config().name);
+        let scheduler = Box::new(CoverageBasedScheduler::new(
+            folder.config(),
+            self.opts.cores_per_campaign,
+            self.opts.campaign_duration,
+            self.parent_harnesses.clone(),
+        ));
 
-                let corpus_herder = VersionedOverwritingHerder::new(
-                    state_location.join("corpora"),
-                    String::from("https://github.com/auto-fuzz/corpora.git"),
-                )
+        let state_location = homedir::get_my_home()
+            .unwrap()
+            .unwrap()
+            .join(".fuzzor")
+            .join(folder.config().name);
+
+        let corpus_herder = VersionedOverwritingHerder::new(
+            state_location.join("corpora"),
+            String::from("https://github.com/auto-fuzz/corpora.git"),
+        )
+        .await
+        .unwrap();
+
+        let state = StdProjectState::new(state_location, corpus_herder);
+
+        let mut project = Project::new(
+            folder,
+            self.allocator.clone(),
+            scheduler,
+            state,
+            ProjectOptions {
+                ignore_first_revision: true,
+                no_fuzzing: false,
+            },
+        );
+
+        let solution_monitor = SolutionReportingMonitor::new(GitHubRepoSolutionReporter::new(
+            "auto-fuzz",
+            "reports",
+            &self.access_token,
+            config.ccs.clone(),
+        ));
+        project.register_monitor(Box::new(solution_monitor));
+
+        let cores = self.cores.clone();
+        let cores_per_build = self.opts.cores_per_build as usize;
+
+        let builder = DockerBuilder::new(cores, cores_per_build, None);
+
+        tokio::spawn(async move {
+            let (_quit_tx, quit_rx) = tokio::sync::mpsc::channel(16);
+            project.run(gh_tracker, builder, quit_rx).await;
+        });
+    }
+
+    async fn fetch_new_prs(&mut self) -> Vec<u64> {
+        let mut prs = Vec::new();
+        let parent_config = self.parent_folder.config();
+
+        let mut page: u32 = 0;
+        'page_loop: loop {
+            if let Ok(result) = self
+                .github
+                .pulls(&parent_config.owner, &parent_config.repo)
+                .list()
+                .sort(octocrab::params::pulls::Sort::Created)
+                .direction(octocrab::params::Direction::Descending) // from newest to oldest
+                .page(page)
+                .send()
                 .await
-                .unwrap();
+            {
+                for pr in result.items.iter() {
+                    if self.already_fuzzing.contains(&pr.number) {
+                        break 'page_loop;
+                    }
 
-                let state = StdProjectState::new(state_location, corpus_herder);
+                    prs.push(pr.number);
+                }
 
-                let mut project = Project::new(
-                    folder,
-                    self.allocator.clone(),
-                    scheduler,
-                    state,
-                    ProjectOptions {
-                        ignore_first_revision: false,
-                        no_fuzzing: false,
-                    },
-                );
-
-                let solution_monitor =
-                    SolutionReportingMonitor::new(GitHubRepoSolutionReporter::new(
-                        "auto-fuzz",
-                        "reports",
-                        &self.access_token,
-                        config.ccs.clone(),
-                    ));
-                project.register_monitor(Box::new(solution_monitor));
-
-                let cores = self.cores.clone();
-                let cores_per_build = self.opts.cores_per_build as usize;
-
-                let builder = DockerBuilder::new(cores, cores_per_build, None);
-
-                tokio::spawn(async move {
-                    let (_quit_tx, quit_rx) = tokio::sync::mpsc::channel(16);
-                    project.run(gh_tracker, builder, quit_rx).await;
-                });
+                page += 1;
+            } else {
+                log::warn!("Could not fetch page {}, bailing!", page);
+                break;
             }
         }
 
-        self.projects_created = true;
-    }
-}
-
-#[async_trait::async_trait]
-impl ProjectMonitor for PullRequestManager {
-    async fn monitor_campaign_event(&mut self, _project: String, _event: CampaignEvent) {}
-
-    async fn monitor_project_event(&mut self, _project: String, event: ProjectEvent) {
-        if self.projects_created {
-            // We've already created all the pull request projects.
-            return;
+        for pr in prs.iter() {
+            self.already_fuzzing.insert(*pr);
         }
 
-        if let ProjectEvent::NewBuild = event {
-            self.create_pr_projects().await;
+        prs
+    }
+
+    async fn create_pr_projects(&mut self) {
+        loop {
+            let mut fetch_interval = tokio::time::interval(tokio::time::Duration::from_secs(
+                std::env::var("FUZZOR_PR_FETCH_INTERVAL").map_or(60 * 60, |val| {
+                    // 1h default
+                    val.parse()
+                        .expect("FUZZOR_PR_FETCH_INTERVAL should be a value in seconds")
+                }),
+            ));
+
+            fetch_interval.tick().await;
+
+            let prs = self.fetch_new_prs().await;
+
+            for pr_num in prs.iter() {
+                let parent_config = self.parent_folder.config();
+
+                if let Some(gh_tracker) = GitHubRevisionTracker::from_pull_request(
+                    parent_config.repo.clone(),
+                    parent_config.owner.clone(),
+                    *pr_num,
+                    self.access_token.clone(),
+                    Some(60 * 60), // 1h
+                )
+                .await
+                {
+                    self.create_pr_project(*pr_num, gh_tracker).await;
+                }
+            }
+
+            self.projects_created = true;
         }
     }
 }
@@ -251,14 +323,16 @@ async fn main() -> Result<(), String> {
         },
     );
 
-    let pr_mngr = PullRequestManager::new(
-        cores.clone(),
-        docker_allocator,
-        folder.clone(),
-        project.harnesses(),
-        opts.clone(),
-        &access_token,
-    );
+    let pr_mngr = PullRequestMonitor {
+        pr_manager: Some(PullRequestManager::new(
+            cores.clone(),
+            docker_allocator,
+            folder.clone(),
+            project.harnesses(),
+            opts.clone(),
+            &access_token,
+        )),
+    };
 
     let solution_monitor = SolutionReportingMonitor::new(GitHubRepoSolutionReporter::new(
         "auto-fuzz",
