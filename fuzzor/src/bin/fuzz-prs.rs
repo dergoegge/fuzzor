@@ -201,6 +201,7 @@ impl PullRequestManager {
                 .list()
                 .sort(octocrab::params::pulls::Sort::Created)
                 .direction(octocrab::params::Direction::Descending) // from newest to oldest
+                .state(octocrab::params::State::Open)
                 .page(page)
                 .send()
                 .await
