@@ -151,7 +151,11 @@ fn deduplication_id_from_libfuzzer_trace(stack_trace: &str) -> Option<String> {
     let mut hash = false;
 
     for line in lines {
-        if line.contains("==ERROR") || line.contains("== ERROR") || line.contains("==WARNING") {
+        if line.contains("runtime error:")
+            || line.contains("==ERROR")
+            || line.contains("== ERROR")
+            || line.contains("==WARNING")
+        {
             hash = true;
         }
 
