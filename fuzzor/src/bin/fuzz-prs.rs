@@ -12,7 +12,7 @@ use fuzzor::project::{
     revision_tracker::GitHubRevisionTracker,
     scheduler::{CoverageBasedScheduler, RoundRobinCampaignScheduler},
     state::StdProjectState,
-    Project, ProjectEvent,
+    Project, ProjectEvent, ProjectOptions,
 };
 use fuzzor::solutions::reporter::GitHubRepoSolutionReporter;
 
@@ -56,67 +56,6 @@ struct Options {
         default_value_t = 16
     )]
     base_campaign_duration: u64,
-}
-
-struct GitHubReportingBuildFailureMonitor {
-    github: octocrab::Octocrab,
-    repo: String,
-    owner: String,
-    ccs: Vec<String>,
-
-    failure_counters: HashMap<String, u64>,
-}
-
-unsafe impl Send for GitHubReportingBuildFailureMonitor {}
-
-impl GitHubReportingBuildFailureMonitor {
-    pub fn new(owner: &str, repo: &str, ccs: Vec<String>, access_token: &str) -> Self {
-        Self {
-            github: Octocrab::builder()
-                .personal_token(access_token.to_string())
-                .build()
-                .unwrap(),
-            repo: repo.to_string(),
-            owner: owner.to_string(),
-            ccs,
-            failure_counters: HashMap::new(),
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl ProjectMonitor for GitHubReportingBuildFailureMonitor {
-    async fn monitor_campaign_event(&mut self, _project: String, _event: CampaignEvent) {}
-    async fn monitor_project_event(&mut self, project: String, event: ProjectEvent) {
-        match event {
-            ProjectEvent::BuildFailure => {
-                if let Some(counter) = self.failure_counters.get_mut(&project) {
-                    *counter += 1;
-                } else {
-                    self.failure_counters.insert(project.clone(), 1);
-                }
-
-                if *self.failure_counters.get(&project).unwrap() == 3 {
-                    // Report that last three builds failed
-                    if let Err(err) = self
-                        .github
-                        .issues(&self.owner, &self.repo)
-                        .create(format!("{}: Build failure", project))
-                        .body("Last three builds failed.")
-                        .labels(vec!["Build Failure".to_string()])
-                        .assignees(self.ccs.clone())
-                        .send()
-                        .await
-                    {
-                        log::error!("Could not open issue for build failure: {:?}", err);
-                    }
-                }
-            }
-            ProjectEvent::NewBuild => {
-                self.failure_counters.remove(&project);
-            }
-        }
-    }
 }
 
 struct PullRequestManager {
@@ -200,7 +139,16 @@ impl PullRequestManager {
 
                 let state = StdProjectState::new(state_location, corpus_herder);
 
-                let mut project = Project::new(folder, self.allocator.clone(), scheduler, state);
+                let mut project = Project::new(
+                    folder,
+                    self.allocator.clone(),
+                    scheduler,
+                    state,
+                    ProjectOptions {
+                        ignore_first_revision: false,
+                        no_fuzzing: false,
+                    },
+                );
 
                 let solution_monitor =
                     SolutionReportingMonitor::new(GitHubRepoSolutionReporter::new(
@@ -291,7 +239,17 @@ async fn main() -> Result<(), String> {
     let state = StdProjectState::new(state_location, corpus_herder);
 
     let folder_clone = folder.clone();
-    let mut project = Project::new(folder_clone, docker_allocator.clone(), scheduler, state);
+    let mut project = Project::new(
+        folder_clone,
+        docker_allocator.clone(),
+        scheduler,
+        state,
+        ProjectOptions {
+            ignore_first_revision: false,
+            // Don't fuzz the base project, but do build it.
+            no_fuzzing: true,
+        },
+    );
 
     let pr_mngr = PullRequestManager::new(
         cores.clone(),
@@ -309,14 +267,6 @@ async fn main() -> Result<(), String> {
         config.ccs.clone(),
     ));
     project.register_monitor(Box::new(solution_monitor));
-
-    let build_monitor = GitHubReportingBuildFailureMonitor::new(
-        "auto-fuzz",
-        "reports",
-        config.ccs.clone(),
-        &access_token,
-    );
-    project.register_monitor(Box::new(build_monitor));
 
     project.register_monitor(Box::new(pr_mngr));
 

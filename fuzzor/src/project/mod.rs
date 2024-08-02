@@ -30,6 +30,14 @@ pub enum ProjectEvent {
     BuildFailure,
 }
 
+pub struct ProjectOptions {
+    /// Ignore the first revision returned by the revision tracker and only start fuzzing on the
+    /// next revision that becomes available.
+    pub ignore_first_revision: bool,
+    /// Only build the environment but schedule any fuzzing campaigns.
+    pub no_fuzzing: bool,
+}
+
 pub struct Project<E, D, EA, CH, S>
 where
     E: Environment,
@@ -52,6 +60,8 @@ where
 
     monitors: Vec<Box<dyn ProjectMonitor + Send>>,
 
+    options: ProjectOptions,
+
     phantom: std::marker::PhantomData<CH>,
 }
 
@@ -68,6 +78,7 @@ where
         env_allocator: EA,
         scheduler: Box<dyn CampaignScheduler + Send>,
         state: S,
+        options: ProjectOptions,
     ) -> Self {
         Self {
             config: description.config(),
@@ -80,6 +91,7 @@ where
             scheduler: Arc::new(Mutex::new(scheduler)),
             env_allocator,
             monitors: Vec::new(),
+            options,
             phantom: std::marker::PhantomData::default(),
         }
     }
@@ -256,8 +268,15 @@ where
         // Start the builder task, which monitors for new software revision of the project and
         // creates a build for fuzzing it.
         let description = self.description.clone();
+        let ignore_first_revision = self.options.ignore_first_revision;
         tokio::spawn(async move {
-            let mut build_task = BuildTask::new(revision_tracker, builder, description, build_tx);
+            let mut build_task = BuildTask::new(
+                revision_tracker,
+                builder,
+                description,
+                build_tx,
+                ignore_first_revision,
+            );
             build_task.run().await;
         });
 
@@ -275,21 +294,26 @@ where
         // Channel used to wake up the scheduler task.
         let (wake_up_tx, wake_up_rx) = tokio::sync::mpsc::channel(16);
         self.wake_up_scheduler = Some(wake_up_tx);
-        let scheduler_task = tokio::spawn(async move {
-            let mut campaign_scheduler_task: CampaignScheduleTask<E, EA, CH> =
-                CampaignScheduleTask {
-                    project_config: config,
-                    schedule: scheduler,
-                    campaign_sender: campaign_tx,
-                    env_allocator,
-                    corpus_herder,
-                    wake_up_receiver: wake_up_rx,
-                    campaign_event_sender: campaign_event_tx,
-                    harnesses,
-                };
+        let scheduler_task = if !self.options.no_fuzzing {
+            tokio::spawn(async move {
+                let mut campaign_scheduler_task: CampaignScheduleTask<E, EA, CH> =
+                    CampaignScheduleTask {
+                        project_config: config,
+                        schedule: scheduler,
+                        campaign_sender: campaign_tx,
+                        env_allocator,
+                        corpus_herder,
+                        wake_up_receiver: wake_up_rx,
+                        campaign_event_sender: campaign_event_tx,
+                        harnesses,
+                    };
 
-            campaign_scheduler_task.run().await;
-        });
+                campaign_scheduler_task.run().await;
+            })
+        } else {
+            // Dummy tokio task that does nothing.
+            tokio::spawn(async {})
+        };
 
         // This is the main project loop. It handles new builds, new campaigns and campaign events.
         loop {
@@ -322,6 +346,7 @@ struct BuildTask<R, RT, B, D> {
     description: D,
 
     build_sender: Sender<Result<ProjectBuild<R>, String>>,
+    ignore_first_revision: bool,
 }
 
 impl<R, RT, B, D> BuildTask<R, RT, B, D>
@@ -336,6 +361,7 @@ where
         builder: B,
         description: D,
         build_sender: Sender<Result<ProjectBuild<R>, String>>,
+        ignore_first_revision: bool,
     ) -> Self {
         Self {
             current_revision: None,
@@ -343,6 +369,7 @@ where
             builder,
             description,
             build_sender,
+            ignore_first_revision,
         }
     }
 
@@ -356,6 +383,11 @@ where
                     .track(self.current_revision.clone())
                     .await,
             );
+
+            if self.ignore_first_revision {
+                self.ignore_first_revision = false;
+                continue;
+            }
 
             // Re-build the fuzzing image
             let build = self

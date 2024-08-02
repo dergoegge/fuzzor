@@ -11,7 +11,7 @@ use fuzzor::project::{
     revision_tracker::GitHubRevisionTracker,
     scheduler::{CampaignScheduler, CoverageBasedScheduler, OneShotScheduler},
     state::StdProjectState,
-    Project, ProjectEvent,
+    Project, ProjectEvent, ProjectOptions,
 };
 use fuzzor::solutions::reporter::GitHubRepoSolutionReporter;
 
@@ -187,7 +187,16 @@ async fn main() -> Result<(), String> {
     .await?;
 
     let state = StdProjectState::new(state_location, corpus_herder);
-    let mut project = Project::new(folder, docker_allocator, scheduler, state);
+    let mut project = Project::new(
+        folder,
+        docker_allocator,
+        scheduler,
+        state,
+        ProjectOptions {
+            ignore_first_revision: false,
+            no_fuzzing: false,
+        },
+    );
 
     let solution_monitor = SolutionReportingMonitor::new(GitHubRepoSolutionReporter::new(
         "auto-fuzz",

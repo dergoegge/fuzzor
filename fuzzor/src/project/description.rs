@@ -1,6 +1,6 @@
 use std::fs;
-use std::path::PathBuf;
-
+use std::io::Read;
+use std::path::{Path, PathBuf};
 
 use fuzzor_infra::ProjectConfig;
 
@@ -78,7 +78,41 @@ impl InMemoryProjectFolder {
 
 impl ProjectDescription for InMemoryProjectFolder {
     fn tarball(&self) -> Vec<u8> {
-        self.tarball.clone()
+        // Replace the config.yaml in `self.tarball` with `self.config`, so that any changes made
+        // to it are reflected in image builds.
+
+        let mut tar_builder = tar::Builder::new(Vec::new());
+
+        // Add the config.yaml file
+        let mut config_yaml = Vec::new();
+        serde_yaml::to_writer(&mut config_yaml, &self.config).unwrap();
+        let mut header = tar::Header::new_gnu();
+        header.set_size(config_yaml.len() as u64);
+        header.set_cksum();
+        tar_builder
+            .append_data(&mut header, "config.yaml", &config_yaml[..])
+            .unwrap();
+
+        // Add other files from the original tarball
+        let mut ar = tar::Archive::new(&self.tarball[..]);
+        for entry in ar.entries().unwrap() {
+            let mut entry = entry.unwrap();
+            if entry.path().unwrap() != Path::new("config.yaml") {
+                let mut file_contents = Vec::new();
+                entry.read_to_end(&mut file_contents).unwrap();
+                let mut header = entry.header().clone();
+                header.set_cksum();
+                tar_builder
+                    .append_data(
+                        &mut header,
+                        entry.path().unwrap().as_ref(),
+                        &file_contents[..],
+                    )
+                    .unwrap();
+            }
+        }
+
+        tar_builder.into_inner().unwrap()
     }
 
     fn config(&self) -> ProjectConfig {
