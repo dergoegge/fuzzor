@@ -151,11 +151,11 @@ fn deduplication_id_from_libfuzzer_trace(stack_trace: &str) -> Option<String> {
     let mut hash = false;
 
     for line in lines {
-        if line.contains("== ERROR") || line.contains("==WARNING") {
+        if line.contains("==ERROR") || line.contains("== ERROR") || line.contains("==WARNING") {
             hash = true;
         }
 
-        if line.starts_with("SUMMARY") {
+        if hash && line.starts_with("SUMMARY") {
             return Some(hex::encode(hasher.finalize()));
         }
 
@@ -236,6 +236,10 @@ mod tests {
         }
 
         {
+            let input = vec![0u8];
+            let crash0 = Solution::from_crash(input, String::from("==ERROR\n\nSUMMARY"));
+            assert_ne!(crash0.id(), crash0.unique_id());
+
             let input = vec![0u8];
             let crash1 = Solution::from_crash(input, String::from("== ERROR\n\nSUMMARY"));
             assert_ne!(crash1.id(), crash1.unique_id());
