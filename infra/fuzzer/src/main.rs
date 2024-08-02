@@ -63,6 +63,8 @@ async fn main() -> Result<(), std::io::Error> {
         };
 
     let mut command = tokio::process::Command::new("ensemble-fuzz");
+    // afl++ requires symbolize=0
+    command.env("ASAN_OPTIONS", "detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:abort_on_error=1:symbolize=0");
     let mut supported_fuzzers = Vec::new();
 
     let mut cores_assigned = 0;
