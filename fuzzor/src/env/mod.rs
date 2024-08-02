@@ -13,7 +13,8 @@ use tokio::sync::{Mutex, Semaphore};
 pub trait Environment {
     /// Get environment identifier
     fn get_id(&self) -> impl Future<Output = String> + Send;
-    /// Get aggreagated fuzzer stats
+    /// Get fuzzer stats, aggregated over all fuzz instances that are running as part of the active
+    /// campaign.
     fn get_stats(&self) -> impl Future<Output = Result<FuzzerStats, String>> + Send;
     /// Get all fuzz solutions (crashes, timeouts, etc.) found so far
     fn get_solutions(&self) -> impl Future<Output = Result<Vec<Solution>, String>> + Send;

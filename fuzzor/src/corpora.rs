@@ -1,13 +1,11 @@
 use std::future::Future;
 use std::path::PathBuf;
 
-
-/// CorpusHerder acts a single source for corpora across projects.
+/// CorpusHerder acts a single source for corpora.
 pub trait CorpusHerder<C: Send> {
-    /// Merge new inputs for a given project and harness its existing corpus.
+    /// Merge new inputs into its existing corpus.
     fn merge(&mut self, harness: String, corpus: C) -> impl Future<Output = Result<(), String>>;
-
-    /// Get the latest corpus for a given project and harness.
+    /// Get the latest corpus for a given harness.
     fn fetch(&self, harness: String) -> impl Future<Output = Result<C, String>> + Send;
 }
 
