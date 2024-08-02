@@ -25,6 +25,7 @@ use fuzzor_infra::ProjectConfig;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::Mutex;
 
+#[derive(Debug)]
 pub enum ProjectEvent {
     NewBuild,
     BuildFailure,

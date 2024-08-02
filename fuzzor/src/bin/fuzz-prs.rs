@@ -60,6 +60,7 @@ impl ProjectMonitor for PullRequestMonitor {
     async fn monitor_campaign_event(&mut self, _project: String, _event: CampaignEvent) {}
 
     async fn monitor_project_event(&mut self, _project: String, event: ProjectEvent) {
+        log::trace!("New project event: {:?}", &event);
         if self.pr_manager.is_some() {
             return;
         }
@@ -80,7 +81,6 @@ struct PullRequestManager {
     parent_folder: InMemoryProjectFolder,
     parent_harnesses: SharedHarnessMap,
     opts: Options,
-    projects_created: bool,
     access_token: String,
 
     already_fuzzing: HashSet<u64>,
@@ -105,7 +105,6 @@ impl PullRequestManager {
             allocator,
             parent_folder,
             opts,
-            projects_created: false,
             parent_harnesses,
             cores,
             access_token: access_token.to_string(),
@@ -206,6 +205,8 @@ impl PullRequestManager {
                 .send()
                 .await
             {
+                log::trace!("Fetched pr page {} with {} prs", page, result.items.len());
+
                 for pr in result.items.iter() {
                     if self.already_fuzzing.contains(&pr.number) {
                         break 'page_loop;
@@ -229,17 +230,9 @@ impl PullRequestManager {
     }
 
     async fn create_pr_projects(&mut self) {
+        log::trace!("Entering pr fetch loop");
+
         loop {
-            let mut fetch_interval = tokio::time::interval(tokio::time::Duration::from_secs(
-                std::env::var("FUZZOR_PR_FETCH_INTERVAL").map_or(60 * 60, |val| {
-                    // 1h default
-                    val.parse()
-                        .expect("FUZZOR_PR_FETCH_INTERVAL should be a value in seconds")
-                }),
-            ));
-
-            fetch_interval.tick().await;
-
             let prs = self.fetch_new_prs().await;
 
             for pr_num in prs.iter() {
@@ -258,7 +251,14 @@ impl PullRequestManager {
                 }
             }
 
-            self.projects_created = true;
+            let fetch_interval = tokio::time::Duration::from_secs(
+                std::env::var("FUZZOR_PR_FETCH_INTERVAL").map_or(60 * 60, |val| {
+                    // 1h default
+                    val.parse()
+                        .expect("FUZZOR_PR_FETCH_INTERVAL should be a value in seconds")
+                }),
+            );
+            tokio::time::sleep(fetch_interval).await;
         }
     }
 }
