@@ -148,7 +148,14 @@ impl Fuzzer for SemSanFuzzer {
         };
 
         let mut command = tokio::process::Command::new(semsan_binary);
-        command.args(&["--comparator", &self.comparator, "--timeout", "5000"]);
+
+        if let Ok(comparator) = std::env::var("SEMSAN_CUSTOM_COMPARATOR") {
+            command.env("LD_PRELOAD", comparator);
+            command.args(&["--comparator", "custom"]);
+        } else {
+            command.args(&["--comparator", &self.comparator]);
+        }
+        command.args(&["--timeout", "5000"]);
         command.args(&[&self.primary_binary, &self.secondary_binary]);
         command.args(&[
             "fuzz",

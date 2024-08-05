@@ -190,7 +190,11 @@ async fn reproduce_differential_solution(
     };
 
     let mut semsan_cmd = tokio::process::Command::new(semsan_binary);
-    // TODO semsan comparator
+
+    if let Ok(comparator) = std::env::var("SEMSAN_CUSTOM_COMPARATOR") {
+        command.env("LD_PRELOAD", comparator);
+        command.args(&["--comparator", "custom"]);
+    }
     semsan_cmd.args(&["--timeout", "5000"]);
     semsan_cmd.args(&["--solution-exit-code", "71"]);
     semsan_cmd.args(&[&primary, &secondary]);

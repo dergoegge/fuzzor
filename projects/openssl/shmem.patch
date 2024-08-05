@@ -31,7 +31,7 @@ index 554c6c2..9dd1e22 100644
      driver = std::make_shared<cryptofuzz::Driver>(options);
      cryptofuzz_options = driver->GetOptionsPtr();
 diff --git a/executor.cpp b/executor.cpp
-index 86128f5..b850304 100644
+index 86128f5..2a8679f 100644
 --- a/executor.cpp
 +++ b/executor.cpp
 @@ -3,6 +3,7 @@
@@ -42,7 +42,7 @@ index 86128f5..b850304 100644
  #include <fuzzing/memory.hpp>
  #include <algorithm>
  #include <set>
-@@ -2486,6 +2487,37 @@ bool ExecutorBase<component::MAC, operation::HMAC>::dontCompare(const operation:
+@@ -2486,6 +2487,40 @@ bool ExecutorBase<component::MAC, operation::HMAC>::dontCompare(const operation:
  
  template <class ResultType, class OperationType>
  void ExecutorBase<ResultType, OperationType>::compare(const std::vector< std::pair<std::shared_ptr<Module>, OperationType> >& operations, const ResultSet& results, const uint8_t* data, const size_t size) const {
@@ -54,6 +54,7 @@ index 86128f5..b850304 100644
 +        // Use the sha1 hash of all the result values as the characterization
 +        // value.
 +        Datasource out{nullptr, 0};
++        uint8_t num_results{0};
 +        for (auto res : results) {
 +            if (const std::optional<ResultType> value = res.second) {
 +                if constexpr (std::is_same_v<ResultType, bool>) {
@@ -67,13 +68,15 @@ index 86128f5..b850304 100644
 +                } else {
 +                        value->Serialize(out);
 +                }
++                num_results++;
 +            }
 +        }
 +
 +        std::vector<uint8_t> output = out.GetOut();
 +        auto hash = crypto::sha1(output);
-+        assert(hash.size() <= 32);
-+        memcpy(options.characterization_shmem, hash.data(), hash.size());
++        assert(hash.size() <= 31);
++        options.characterization_shmem[0] = num_results;
++        memcpy(options.characterization_shmem + 1, hash.data(), hash.size());
 +        return;
 +    }
 +

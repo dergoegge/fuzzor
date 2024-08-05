@@ -35,7 +35,7 @@ impl DockerEnv {
 
         // Setup a tmpfs with limited size to avoid blowing up the host's disk space.
         let mut tmpfs = HashMap::new();
-        tmpfs.insert("/tmp".to_string(), "size=2G".to_string());
+        tmpfs.insert("/tmp".to_string(), "size=8G".to_string());
 
         let fuzz_cmd = format!(
             "fuzzer --duration {} --workspace ./workspace ./config.yaml {}",
