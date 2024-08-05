@@ -10,7 +10,7 @@ use fuzzor::project::{
     harness::SharedHarnessMap,
     monitor::{ProjectMonitor, SolutionReportingMonitor},
     revision_tracker::GitHubRevisionTracker,
-    scheduler::{CoverageBasedScheduler, RoundRobinCampaignScheduler},
+    scheduler::CoverageBasedScheduler,
     state::StdProjectState,
     Project, ProjectEvent, ProjectOptions,
 };
@@ -49,6 +49,12 @@ struct Options {
         default_value_t = 8
     )]
     base_campaign_duration: u64,
+    #[arg(
+        long = "cores-per-base-campaign",
+        help = "Number of cores to use for each campaign of the base project",
+        default_value_t = 8
+    )]
+    cores_per_base_campaign: u64,
 }
 
 struct PullRequestMonitor {
@@ -257,7 +263,8 @@ impl PullRequestManager {
                     // Skip fuzzing the first revision for already existing PRs (i.e.
                     // first_pr_fetch = true). We will start fuzzing PRs that were already open on
                     // their next push.
-                    self.create_pr_project(first_pr_fetch, *pr_num, gh_tracker).await;
+                    self.create_pr_project(first_pr_fetch, *pr_num, gh_tracker)
+                        .await;
                 }
             }
 
@@ -298,10 +305,11 @@ async fn main() -> Result<(), String> {
     let builder = DockerBuilder::new(cores.clone(), opts.cores_per_build as usize, None);
 
     let docker_allocator = DockerEnvAllocator::new(cores.clone());
-
-    let scheduler = Box::new(RoundRobinCampaignScheduler::new(
+    // Prioritize fuzzing harnesses that reach recently modified files but fall back to round
+    // robin campaign scheduling when necessary.
+    let scheduler = Box::new(CoverageBasedScheduler::with_round_robin_fallback(
         folder.config(),
-        opts.cores_per_campaign,
+        opts.cores_per_base_campaign,
         opts.base_campaign_duration,
     ));
 
@@ -328,8 +336,7 @@ async fn main() -> Result<(), String> {
         state,
         ProjectOptions {
             ignore_first_revision: false,
-            // Don't fuzz the base project, but do build it.
-            no_fuzzing: true,
+            no_fuzzing: false,
         },
     );
 
