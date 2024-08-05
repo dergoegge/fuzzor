@@ -31,7 +31,7 @@ index 554c6c2..9dd1e22 100644
      driver = std::make_shared<cryptofuzz::Driver>(options);
      cryptofuzz_options = driver->GetOptionsPtr();
 diff --git a/executor.cpp b/executor.cpp
-index 86128f5..2a8679f 100644
+index 86128f5..68727d0 100644
 --- a/executor.cpp
 +++ b/executor.cpp
 @@ -3,6 +3,7 @@
@@ -42,15 +42,12 @@ index 86128f5..2a8679f 100644
  #include <fuzzing/memory.hpp>
  #include <algorithm>
  #include <set>
-@@ -2486,6 +2487,40 @@ bool ExecutorBase<component::MAC, operation::HMAC>::dontCompare(const operation:
+@@ -2486,6 +2487,37 @@ bool ExecutorBase<component::MAC, operation::HMAC>::dontCompare(const operation:
  
  template <class ResultType, class OperationType>
  void ExecutorBase<ResultType, OperationType>::compare(const std::vector< std::pair<std::shared_ptr<Module>, OperationType> >& operations, const ResultSet& results, const uint8_t* data, const size_t size) const {
 +    if (options.characterization_shmem != nullptr && !operations.empty() &&
 +        dontCompare(operations[0].second) == false) {
-+        if (std::is_same_v<OperationType, operation::ECC_Point_Mul> ||
-+            std::is_same_v<OperationType, operation::ECC_PrivateToPublic>)
-+            return;
 +        // Use the sha1 hash of all the result values as the characterization
 +        // value.
 +        Datasource out{nullptr, 0};
