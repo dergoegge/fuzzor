@@ -13,6 +13,9 @@ RUN mv ./bitcoin/test/sanitizer_suppressions/ubsan ./ubsan_suppressions
 # No idea why this is needed but the existing file based suppression
 # "secp256k1/" does not seem to work.
 RUN echo "unsigned-integer-overflow:secp256k1_*" >> ./ubsan_suppressions
+# FuzzedDataProvider::ConsumeIntegralInRange should already be suppressed, but
+# the symbol based suppression doesn't seem to work.
+RUN echo "unsigned-integer-overflow:FuzzedDataProvider.h" >> ./ubsan_suppressions
 
 COPY ./config.yaml .
 COPY ./build.sh .
