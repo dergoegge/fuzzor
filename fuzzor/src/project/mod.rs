@@ -35,7 +35,7 @@ pub struct ProjectOptions {
     /// Ignore the first revision returned by the revision tracker and only start fuzzing on the
     /// next revision that becomes available.
     pub ignore_first_revision: bool,
-    /// Only build the environment but schedule any fuzzing campaigns.
+    /// Only build the environment but don't schedule any fuzzing campaigns.
     pub no_fuzzing: bool,
 }
 

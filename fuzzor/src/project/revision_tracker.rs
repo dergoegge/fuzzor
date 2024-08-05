@@ -91,6 +91,14 @@ impl GitHubRevisionTracker {
             .unwrap();
 
         if let Ok(pr) = github.pulls(&base_owner, &base_repo).get(pr_num).await {
+            log::info!(
+                "New GitHub pull request for {}/{} \"{}\": {}",
+                &base_owner,
+                &base_repo,
+                pr.title.unwrap_or(String::new()),
+                pr.url
+            );
+
             let (owner, repo) = if let Some(repo) = pr.head.repo.as_ref() {
                 (
                     repo.owner.as_ref().unwrap().login.clone(),

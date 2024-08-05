@@ -112,7 +112,12 @@ impl PullRequestManager {
         }
     }
 
-    async fn create_pr_project(&mut self, pr_num: u64, gh_tracker: GitHubRevisionTracker) {
+    async fn create_pr_project(
+        &mut self,
+        ignore_first_revision: bool,
+        pr_num: u64,
+        gh_tracker: GitHubRevisionTracker,
+    ) {
         let parent_config = self.parent_folder.config();
 
         log::info!(
@@ -165,7 +170,7 @@ impl PullRequestManager {
             scheduler,
             state,
             ProjectOptions {
-                ignore_first_revision: true,
+                ignore_first_revision,
                 no_fuzzing: false,
             },
         );
@@ -213,7 +218,7 @@ impl PullRequestManager {
                 log::trace!("Fetched pr page {} with {} prs", page, result.items.len());
 
                 for pr in result.items.iter() {
-                    if self.already_fuzzing.contains(&pr.number) {
+                    if !self.already_fuzzing.insert(pr.number) {
                         break 'page_loop;
                     }
 
@@ -227,10 +232,6 @@ impl PullRequestManager {
             }
         }
 
-        for pr in prs.iter() {
-            self.already_fuzzing.insert(*pr);
-        }
-
         prs
     }
 
@@ -238,6 +239,7 @@ impl PullRequestManager {
         log::trace!("Entering pr fetch loop");
 
         loop {
+            let first_pr_fetch = self.already_fuzzing.is_empty();
             let prs = self.fetch_new_prs().await;
 
             for pr_num in prs.iter() {
@@ -252,7 +254,10 @@ impl PullRequestManager {
                 )
                 .await
                 {
-                    self.create_pr_project(*pr_num, gh_tracker).await;
+                    // Skip fuzzing the first revision for already existing PRs (i.e.
+                    // first_pr_fetch = true). We will start fuzzing PRs that were already open on
+                    // their next push.
+                    self.create_pr_project(first_pr_fetch, *pr_num, gh_tracker).await;
                 }
             }
 
