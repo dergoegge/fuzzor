@@ -54,6 +54,8 @@ pub struct SemSanFuzzer {
     pub solutions: PathBuf,
     pub pull_corpus: PathBuf,
     pub comparator: String,
+
+    last_stats: Arc<Mutex<Option<FuzzerStats>>>,
 }
 
 impl SemSanFuzzer {
@@ -72,6 +74,8 @@ impl SemSanFuzzer {
             solutions,
             pull_corpus,
             comparator,
+
+            last_stats: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -85,11 +89,8 @@ impl Fuzzer for SemSanFuzzer {
         self.get_name().to_string()
     }
     async fn get_stats(&self) -> FuzzerStats {
-        FuzzerStats {
-            saved_crashes: std::fs::read_dir(&self.solutions).unwrap().count() as u64,
-            // TODO parse other stats from stdout
-            ..Default::default()
-        }
+        let stats = self.last_stats.lock().await.clone();
+        stats.unwrap_or(FuzzerStats::default())
     }
 
     fn get_push_corpus(&self) -> PathBuf {
@@ -169,11 +170,17 @@ impl Fuzzer for SemSanFuzzer {
         ]);
 
         command
-            .stdout(Stdio::null())
+            .stdout(Stdio::piped())
             .stderr(Stdio::null())
-            .kill_on_drop(true)
-            .spawn()
-            .unwrap()
+            .kill_on_drop(true);
+
+        let mut child = command.spawn().expect("Could not start SemSan instance");
+
+        let stdout = child.stdout.take().unwrap();
+
+        spawn_semsan_log_parser(BufReader::new(stdout), self.last_stats.clone());
+
+        child
     }
 }
 
@@ -628,61 +635,103 @@ impl Fuzzer for LibFuzzer {
         let mut child = command.spawn().expect("Could not start libFuzzer instance");
 
         let stderr = child.stderr.take().unwrap();
-        let mut stderr_reader = BufReader::new(stderr).lines();
 
-        let last_stats = self.last_stats.clone();
-        let instance_name = self.get_instance_name();
-        tokio::spawn(async move {
-            while let Ok(Some(line)) = stderr_reader.next_line().await {
-                // Match lines as the following:
-                // "#505851: cov: 5744 ft: 5240 corp: 1284 exec/s: 20917 oom/timeout/crash: 0/0/0 time: 36s job: 7 dft_time: 0"
-                // "#37221: cov: 5298 ft: 5298 corp: 1302 exec/s: 18610 oom/timeout/crash: 0/0/0 time: 2s job: 1 dft_time: 0"
-                // "#70933: cov: 5298 ft: 5298 corp: 1302 exec/s: 11237 oom/timeout/crash: 0/0/0 time: 6s job: 2 dft_time: 0"
-                // "#79983: cov: 136 ft: 193 corp: 41 exec/s 16059 oom/timeout/crash: 0/0/0 time: 5s job: 2 dft_time: 0" (example from cargo-fuzz)
-
-                // The ":" after "exec/s" is not there for cargo-fuzz, so we treat it as optional
-                let new_regex =
-                    regex::Regex::new(r"#[0-9]*: cov: [0-9]* ft: [0-9]* corp: (?<corpus>[0-9]*) exec/s[:]? (?<execs_per_sec>[0-9]*) oom/timeout/crash: [0-9]*/(?<hangs>[0-9]*)/(?<crashes>[0-9]*).*")
-                        .unwrap();
-                log::trace!("({}) {}", new_regex.is_match(&line), line);
-
-                let Some(caps) = new_regex.captures(&line) else {
-                    continue;
-                };
-
-                let caps_crashes = caps["crashes"].parse().unwrap_or(0);
-                let num_crashes = if caps_crashes > 0 {
-                    let crashes = std::fs::read_dir(&solutions_dirs[0])
-                        .unwrap()
-                        .collect::<Result<Vec<_>, std::io::Error>>()
-                        .unwrap();
-
-                    if crashes.is_empty() {
-                        // LibFuzzer reported a crash but didn't store it on disk for some reason.
-                        // Noticed with Go targets compiled for LibFuzzer with go-118-fuzz-build.
-                        0u64
-                    } else {
-                        log::trace!("Solutions {}: {:?}", instance_name, &crashes);
-                        caps_crashes
-                    }
-                } else {
-                    caps_crashes
-                };
-
-                let mut stats = last_stats.lock().await;
-                *stats = Some(FuzzerStats {
-                    execs_per_sec: caps["execs_per_sec"].parse().unwrap_or(0.0),
-                    corpus_count: caps["corpus"].parse().unwrap_or(0),
-                    // Stability not available from libFuzzer output :(
-                    stability: None,
-                    saved_hangs: caps["hangs"].parse().unwrap_or(0),
-                    saved_crashes: num_crashes,
-                });
-            }
-        });
+        spawn_libfuzzer_log_parser(
+            self.get_instance_name(),
+            BufReader::new(stderr),
+            self.last_stats.clone(),
+            solutions_dirs[0].clone(),
+        );
 
         child
     }
+}
+
+fn spawn_semsan_log_parser(
+    stdout_reader: BufReader<tokio::process::ChildStdout>,
+    last_stats: Arc<Mutex<Option<FuzzerStats>>>,
+) {
+    let mut lines = stdout_reader.lines();
+
+    tokio::spawn(async move {
+        while let Ok(Some(line)) = lines.next_line().await {
+            // [UserStats #0] run time: 0h-0m-0s, clients: 1, corpus: 18, objectives: 0, executions: 536, exec/sec: 0.000, combined-coverage: 8/65599 (0%), stability: 4/7 (57%)
+            // [UserStats #0] run time: 0h-0m-0s, clients: 1, corpus: 19, objectives: 0, executions: 602, exec/sec: 0.000, combined-coverage: 8/65599 (0%), stability: 4/7 (57%)
+            // [UserStats #0] run time: 0h-0m-0s, clients: 1, corpus: 20, objectives: 0, executions: 604, exec/sec: 0.000, combined-coverage: 8/65599 (0%), stability: 4/7 (57%)
+
+            let new_regex =
+                    regex::Regex::new(r".* run time: .*, clients: .*, corpus: (?<corpus>[0-9]*), objectives: (?<solutions>.*), executions: .*, exec/sec: (?<execs_per_sec>.*), combined-coverage: .*, stability: [0-9]*/[0-9]* \((?<stability>[0-9]*)%")
+                        .unwrap();
+
+            let Some(caps) = new_regex.captures(&line) else {
+                continue;
+            };
+
+            let mut stats = last_stats.lock().await;
+            *stats = Some(FuzzerStats {
+                execs_per_sec: caps["execs_per_sec"].parse().unwrap_or(0.0),
+                corpus_count: caps["corpus"].parse().unwrap_or(0),
+                stability: None, // Some(caps["stability"].parse().unwrap_or(0)),
+                saved_hangs: 0,  // Not stored by SemSan
+                saved_crashes: caps["solutions"].parse().unwrap_or(0),
+            });
+        }
+    });
+}
+
+fn spawn_libfuzzer_log_parser(
+    instance_name: String,
+    stderr_reader: BufReader<tokio::process::ChildStderr>,
+    last_stats: Arc<Mutex<Option<FuzzerStats>>>,
+    crash_dir: PathBuf,
+) {
+    let mut lines = stderr_reader.lines();
+
+    tokio::spawn(async move {
+        while let Ok(Some(line)) = lines.next_line().await {
+            // Match lines as the following:
+            // "#505851: cov: 5744 ft: 5240 corp: 1284 exec/s: 20917 oom/timeout/crash: 0/0/0 time: 36s job: 7 dft_time: 0"
+            // "#37221: cov: 5298 ft: 5298 corp: 1302 exec/s: 18610 oom/timeout/crash: 0/0/0 time: 2s job: 1 dft_time: 0"
+            // "#70933: cov: 5298 ft: 5298 corp: 1302 exec/s: 11237 oom/timeout/crash: 0/0/0 time: 6s job: 2 dft_time: 0"
+            // "#79983: cov: 136 ft: 193 corp: 41 exec/s 16059 oom/timeout/crash: 0/0/0 time: 5s job: 2 dft_time: 0" (example from cargo-fuzz)
+
+            // The ":" after "exec/s" is not there for cargo-fuzz, so we treat it as optional
+            let new_regex =
+                    regex::Regex::new(r"#[0-9]*: cov: [0-9]* ft: [0-9]* corp: (?<corpus>[0-9]*) exec/s[:]? (?<execs_per_sec>[0-9]*) oom/timeout/crash: [0-9]*/(?<hangs>[0-9]*)/(?<crashes>[0-9]*).*")
+                        .unwrap();
+            log::trace!("({}) {}", new_regex.is_match(&line), line);
+
+            let Some(caps) = new_regex.captures(&line) else {
+                continue;
+            };
+
+            let mut saved_crashes = caps["crashes"].parse().unwrap_or(0);
+            if saved_crashes > 0 {
+                let crashes = std::fs::read_dir(&crash_dir)
+                    .unwrap()
+                    .collect::<Result<Vec<_>, std::io::Error>>()
+                    .unwrap();
+
+                if crashes.is_empty() {
+                    // LibFuzzer reported a crash but didn't store it on disk for some reason.
+                    // Noticed with Go targets compiled for LibFuzzer with go-118-fuzz-build.
+                    saved_crashes = 0;
+                } else {
+                    log::trace!("Solutions {}: {:?}", instance_name, &crashes);
+                }
+            }
+
+            let mut stats = last_stats.lock().await;
+            *stats = Some(FuzzerStats {
+                execs_per_sec: caps["execs_per_sec"].parse().unwrap_or(0.0),
+                corpus_count: caps["corpus"].parse().unwrap_or(0),
+                // Stability not available from libFuzzer output :(
+                stability: None,
+                saved_hangs: caps["hangs"].parse().unwrap_or(0),
+                saved_crashes,
+            });
+        }
+    });
 }
 
 /// Aggregate [`FuzzerStats`] across multiple fuzzer instances.
