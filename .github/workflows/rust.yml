@@ -1,10 +1,12 @@
 name: Rust
 
 on:
-  push:
-    branches: [ "master" ]
   pull_request:
-    branches: [ "master" ]
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
 
 env:
   CARGO_TERM_COLOR: always
