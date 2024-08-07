@@ -132,9 +132,9 @@ async fn build_cpp(
             cxx: AFL_CLANG_CXX,
             ld: AFL_CLANG_CC,
             envs: &[
-                ("LIB_FUZZING_ENGINE", "-fsanitize=address"),
-                ("CFLAGS", "-fsanitize=address"),
-                ("CXXFLAGS", "-fsanitize=address"),
+                ("AFL_USE_ASAN", "1"),
+                ("LDFLAGS", "-fuse-ld=lld"),
+                ("CCACHE_DIR", "/ccache_asan/"),
             ],
         },
         (FuzzEngine::LibFuzzer, Sanitizer::None) => BuildEnv {

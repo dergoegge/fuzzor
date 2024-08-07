@@ -22,4 +22,5 @@ COPY ./build.sh .
 
 RUN --mount=type=cache,target=/ccache/ \
     --mount=type=cache,target=/ccache_cmplog/ \
+    --mount=type=cache,target=/ccache_asan/ \
     builder $PWD/config.yaml $PWD/build.sh $FUZZOR_HARNESSES
