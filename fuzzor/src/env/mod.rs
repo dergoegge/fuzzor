@@ -1,5 +1,3 @@
-pub mod docker;
-
 use std::collections::VecDeque;
 use std::future::Future;
 use std::sync::Arc;

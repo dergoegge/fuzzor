@@ -7,6 +7,7 @@ edition = "2021"
 
 fuzzor = { path = "../fuzzor" }
 fuzzor-github = { path = "../fuzzor-github" }
+fuzzor-docker = { path = "../fuzzor-docker" }
 fuzzor_infra = { path = "../infra/types", package = "types", version = "0.1.0"}
 
 tokio = { version = "1.37", features = ["full"] }
