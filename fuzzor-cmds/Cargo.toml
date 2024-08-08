@@ -1,0 +1,24 @@
+[package]
+name = "fuzzor-cmds"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+fuzzor = { path = "../fuzzor" }
+fuzzor-github = { path = "../fuzzor-github" }
+fuzzor_infra = { path = "../infra/types", package = "types", version = "0.1.0"}
+
+tokio = { version = "1.37", features = ["full"] }
+clap = { version = "4.5.4", features = ["derive", "string"] }
+octocrab = "0.38.0"
+async-trait = "0.1.80"
+
+serde = { version = "1.0.197", features = ["derive"] }
+serde_yaml = "0.9.32"
+
+log = "0.4.21"
+env_logger = "0.11.3"
+
+homedir = "0.2.1"
+num_cpus = "1.16.0"

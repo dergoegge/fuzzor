@@ -3,8 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::future::Future;
 
 use super::description::*;
-use super::revision_tracker::Revision;
-use crate::env::Cores;
+use crate::{env::Cores, revisions::Revision};
 
 pub trait ProjectBuilder<R, D>
 where

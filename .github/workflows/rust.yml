@@ -22,10 +22,10 @@ jobs:
     - name: Install rust nightly
       run: rustup install nightly && rustup override set nightly
 
-    - name: Build fuzzor
-      run: cd fuzzor && cargo build --verbose
+    - name: Build fuzzor-cmds
+      run: cd fuzzor-cmds && cargo build --verbose
     - name: Run fuzzor tests
-      run: cd fuzzor && cargo test --verbose
+      run: cd fuzzor-cmds && cargo test --verbose
 
     - name: Build infra/ensemble-fuzz
       run: cd infra/ensemble-fuzz && cargo build --verbose
@@ -71,9 +71,7 @@ jobs:
 
       - name: Build validate-configs
         run: |
-          cd fuzzor
-          cargo run --bin validate-config -- ../projects/bitcoin/config.yaml
-          cargo run --bin validate-config -- ../projects/core-lightning/config.yaml
-          cargo run --bin validate-config -- ../projects/rust-lightning/config.yaml
-          cargo run --bin validate-config -- ../projects/test/config.yaml
+          cd fuzzor-cmds && cargo build --bin validate-config --release --verbose
+          find ../projects/ -type f -name 'config.yaml' -exec target/release/validate-config {} \;
+
 

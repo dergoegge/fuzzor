@@ -3,21 +3,22 @@ pub mod campaign;
 pub mod description;
 pub mod harness;
 pub mod monitor;
-pub mod revision_tracker;
 pub mod scheduler;
 pub mod state;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::corpora::CorpusHerder;
-use crate::env::{Environment, EnvironmentAllocator};
+use crate::{
+    corpora::CorpusHerder,
+    env::{Environment, EnvironmentAllocator},
+    revisions::{Revision, RevisionTracker},
+};
 use builder::{ProjectBuild, ProjectBuilder};
 use campaign::{Campaign, CampaignEvent, CampaignJoinHandle};
 use description::ProjectDescription;
 use harness::{Harness, PersistentHarnessState, SharedHarnessMap};
 use monitor::ProjectMonitor;
-use revision_tracker::{ProjectRevisionTracker, Revision};
 use scheduler::{CampaignScheduler, CampaignSchedulerInput};
 use state::State;
 
@@ -261,7 +262,7 @@ where
     pub async fn run<R, RT, B>(&mut self, revision_tracker: RT, builder: B, mut quit: Receiver<()>)
     where
         R: Revision + Clone + Send + 'static,
-        RT: ProjectRevisionTracker<R> + Send + 'static,
+        RT: RevisionTracker<R> + Send + 'static,
         B: ProjectBuilder<R, D> + Send + 'static,
     {
         let (build_tx, mut build_rx) = tokio::sync::mpsc::channel(16);
@@ -353,7 +354,7 @@ struct BuildTask<R, RT, B, D> {
 impl<R, RT, B, D> BuildTask<R, RT, B, D>
 where
     R: Revision + Clone,
-    RT: ProjectRevisionTracker<R>,
+    RT: RevisionTracker<R>,
     B: ProjectBuilder<R, D>,
     D: ProjectDescription + Clone,
 {

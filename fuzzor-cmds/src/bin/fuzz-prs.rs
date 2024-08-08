@@ -1,20 +1,24 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use fuzzor::corpora::VersionedOverwritingHerder;
-use fuzzor::env::{docker::DockerEnvAllocator, Cores};
-use fuzzor::project::{
-    builder::DockerBuilder,
-    campaign::CampaignEvent,
-    description::{InMemoryProjectFolder, ProjectDescription, ProjectFolder},
-    harness::SharedHarnessMap,
-    monitor::{ProjectMonitor, SolutionReportingMonitor},
-    revision_tracker::GitHubRevisionTracker,
-    scheduler::CoverageBasedScheduler,
-    state::StdProjectState,
-    Project, ProjectEvent, ProjectOptions,
+use fuzzor::{
+    corpora::VersionedOverwritingHerder,
+    env::{docker::DockerEnvAllocator, Cores},
+    project::{
+        builder::DockerBuilder,
+        campaign::CampaignEvent,
+        description::{InMemoryProjectFolder, ProjectDescription, ProjectFolder},
+        harness::SharedHarnessMap,
+        monitor::{ProjectMonitor, SolutionReportingMonitor},
+        scheduler::CoverageBasedScheduler,
+        state::StdProjectState,
+        Project, ProjectEvent, ProjectOptions,
+    },
 };
-use fuzzor::solutions::reporter::GitHubRepoSolutionReporter;
+use fuzzor_github::{
+    reporter::GitHubRepoSolutionReporter,
+    revisions::{GitHubRepository, GitHubRevisionTracker, GithubRevisionSource},
+};
 use fuzzor_infra::FuzzEngine;
 
 use clap::Parser;
@@ -127,16 +131,15 @@ impl PullRequestManager {
         let parent_config = self.parent_folder.config();
 
         log::info!(
-            "Creating project for {} PR #{} (author={} branch={})",
+            "Creating project for {} PR #{} (author={})",
             &parent_config.name,
             pr_num,
-            &gh_tracker.owner,
-            &gh_tracker.branch
+            &gh_tracker.source().0.owner,
         );
 
         let mut folder = self.parent_folder.clone();
-        folder.config_mut().owner = gh_tracker.owner.clone();
-        folder.config_mut().repo = gh_tracker.repo.clone();
+        folder.config_mut().owner = gh_tracker.source().0.owner.clone();
+        folder.config_mut().repo = gh_tracker.source().0.repo.clone();
         if !folder.config_mut().has_engine(&FuzzEngine::LibFuzzer) {
             panic!("Project needs to support LibFuzzer for PR fuzzing!");
             // TODO don't panic, recover gracefully
@@ -144,7 +147,7 @@ impl PullRequestManager {
         // Only use LibFuzzer and "None" to reduce build times
         folder.config_mut().engines = Some(vec![FuzzEngine::LibFuzzer, FuzzEngine::None]);
 
-        folder.config_mut().branch = Some(gh_tracker.branch.clone());
+        folder.config_mut().branch = Some(gh_tracker.lookup_branch().await);
         folder.config_mut().name = format!("{}-pr{}", folder.config_mut().name, pr_num);
         let config = folder.config();
 
@@ -251,21 +254,20 @@ impl PullRequestManager {
             for pr_num in prs.iter() {
                 let parent_config = self.parent_folder.config();
 
-                if let Some(gh_tracker) = GitHubRevisionTracker::from_pull_request(
-                    parent_config.repo.clone(),
-                    parent_config.owner.clone(),
-                    *pr_num,
+                let gh_tracker = GitHubRevisionTracker::new(
                     self.access_token.clone(),
-                    Some(60 * 60), // 1h
-                )
-                .await
-                {
-                    // Skip fuzzing the first revision for already existing PRs (i.e.
-                    // first_pr_fetch = true). We will start fuzzing PRs that were already open on
-                    // their next push.
-                    self.create_pr_project(first_pr_fetch, *pr_num, gh_tracker)
-                        .await;
-                }
+                    GitHubRepository {
+                        owner: parent_config.owner.clone(),
+                        repo: parent_config.repo.clone(),
+                    },
+                    GithubRevisionSource::PullRequest(*pr_num),
+                );
+
+                // Skip fuzzing the first revision for already existing PRs (i.e.
+                // first_pr_fetch = true). We will start fuzzing PRs that were already open on
+                // their next push.
+                self.create_pr_project(first_pr_fetch, *pr_num, gh_tracker)
+                    .await;
             }
 
             let fetch_interval = tokio::time::Duration::from_secs(
@@ -296,10 +298,12 @@ async fn main() -> Result<(), String> {
     let config = folder.config();
 
     let gh_tracker = GitHubRevisionTracker::new(
-        config.owner.clone(),
-        config.repo.clone(),
-        config.branch.clone().unwrap_or(String::from("master")),
         access_token.clone(),
+        GitHubRepository {
+            owner: config.owner.clone(),
+            repo: config.repo.clone(),
+        },
+        GithubRevisionSource::Branch(config.branch.clone().unwrap_or(String::from("master"))),
     );
 
     let builder = DockerBuilder::new(cores.clone(), opts.cores_per_build as usize, None);

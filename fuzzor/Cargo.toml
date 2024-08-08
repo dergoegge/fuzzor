@@ -10,14 +10,12 @@ env_logger = "0.11.3"
 futures-util = "0.3.30"
 hex = "0.4.3"
 log = "0.4.21"
-octocrab = "0.38.0"
 rand = "0.8.5"
 serde = { version = "1.0.197", features = ["derive"] }
 serde_yaml = "0.9.32"
 sha1 = "0.10.6"
 tar = "0.4.40"
 tokio = { version = "1.37", features = ["full"] }
-clap = { version = "4.5.4", features = ["derive", "string"] }
 
 fuzzor_infra = { path = "../infra/types", package = "types", version = "0.1.0"}
 git2 = "0.18.3"

@@ -1,19 +1,23 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use fuzzor::corpora::VersionedOverwritingHerder;
-use fuzzor::env::{docker::DockerEnvAllocator, Cores};
-use fuzzor::project::{
-    builder::DockerBuilder,
-    campaign::CampaignEvent,
-    description::{InMemoryProjectFolder, ProjectDescription, ProjectFolder},
-    monitor::{ProjectMonitor, SolutionReportingMonitor},
-    revision_tracker::GitHubRevisionTracker,
-    scheduler::{CampaignScheduler, CoverageBasedScheduler, OneShotScheduler},
-    state::StdProjectState,
-    Project, ProjectEvent, ProjectOptions,
+use fuzzor::{
+    corpora::VersionedOverwritingHerder,
+    env::{docker::DockerEnvAllocator, Cores},
+    project::{
+        builder::DockerBuilder,
+        campaign::CampaignEvent,
+        description::{InMemoryProjectFolder, ProjectDescription, ProjectFolder},
+        monitor::{ProjectMonitor, SolutionReportingMonitor},
+        scheduler::{CampaignScheduler, CoverageBasedScheduler, OneShotScheduler},
+        state::StdProjectState,
+        Project, ProjectEvent, ProjectOptions,
+    },
 };
-use fuzzor::solutions::reporter::GitHubRepoSolutionReporter;
+use fuzzor_github::{
+    reporter::GitHubRepoSolutionReporter,
+    revisions::{GitHubRepository, GitHubRevisionTracker, GithubRevisionSource},
+};
 
 use clap::Parser;
 use octocrab::Octocrab;
@@ -147,10 +151,12 @@ async fn main() -> Result<(), String> {
     let config = folder.config();
 
     let gh_tracker = GitHubRevisionTracker::new(
-        config.owner.clone(),
-        config.repo.clone(),
-        config.branch.clone().unwrap_or(String::from("master")),
         access_token.clone(),
+        GitHubRepository {
+            owner: config.owner.clone(),
+            repo: config.repo.clone(),
+        },
+        GithubRevisionSource::Branch(config.branch.clone().unwrap_or(String::from("master"))),
     );
 
     let builder = DockerBuilder::new(cores.clone(), opts.cores_per_build as usize, None);

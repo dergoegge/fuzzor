@@ -64,14 +64,6 @@ fn main() {
         }
         ProjectConfig {
             engines: Some(engines),
-            ..
-        } if engines.contains(&FuzzEngine::SemSan)
-            && !engines.contains(&FuzzEngine::AflPlusPlus) =>
-        {
-            panic!("AflPlusPlus must be enabled alongside SemSan");
-        }
-        ProjectConfig {
-            engines: Some(engines),
             sanitizers: Some(sanitizers),
             ..
         } if engines.contains(&FuzzEngine::SemSan)

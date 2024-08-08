@@ -1,0 +1,12 @@
+[package]
+name = "fuzzor-github"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+fuzzor = { path = "../fuzzor" }
+
+log = "0.4.21"
+octocrab = "0.38.0"
+async-trait = "0.1.80"
+tokio = { version = "1.37", features = ["full"] }
