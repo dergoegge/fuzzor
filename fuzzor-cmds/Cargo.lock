@@ -655,17 +655,12 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
- "bollard",
  "env_logger",
- "futures-util",
  "git2",
  "hex",
- "homedir",
  "log",
- "num_cpus",
  "rand",
  "serde",
- "serde_json",
  "serde_yaml",
  "sha1",
  "tar",
@@ -681,6 +676,7 @@ dependencies = [
  "clap",
  "env_logger",
  "fuzzor",
+ "fuzzor-docker",
  "fuzzor-github",
  "homedir",
  "log",
@@ -688,6 +684,23 @@ dependencies = [
  "octocrab",
  "serde",
  "serde_yaml",
+ "tokio",
+ "types",
+]
+
+[[package]]
+name = "fuzzor-docker"
+version = "0.1.0"
+dependencies = [
+ "bollard",
+ "env_logger",
+ "futures-util",
+ "fuzzor",
+ "log",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tar",
  "tokio",
  "types",
 ]

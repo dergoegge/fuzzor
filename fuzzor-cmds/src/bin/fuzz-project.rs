@@ -3,9 +3,8 @@ use std::path::PathBuf;
 
 use fuzzor::{
     corpora::VersionedOverwritingHerder,
-    env::{docker::DockerEnvAllocator, Cores},
+    env::Cores,
     project::{
-        builder::DockerBuilder,
         campaign::CampaignEvent,
         description::{InMemoryProjectFolder, ProjectDescription, ProjectFolder},
         monitor::{ProjectMonitor, SolutionReportingMonitor},
@@ -14,6 +13,7 @@ use fuzzor::{
         Project, ProjectEvent, ProjectOptions,
     },
 };
+use fuzzor_docker::{builder::DockerBuilder, env::DockerEnvAllocator};
 use fuzzor_github::{
     reporter::GitHubRepoSolutionReporter,
     revisions::{GitHubRepository, GitHubRevisionTracker, GithubRevisionSource},

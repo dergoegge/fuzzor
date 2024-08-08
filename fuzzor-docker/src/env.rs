@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::PathBuf;
 
-use crate::{
+use fuzzor::{
     env::{
         Cores, Environment, EnvironmentAllocationError, EnvironmentAllocator, EnvironmentParams,
     },
