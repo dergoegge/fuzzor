@@ -127,6 +127,8 @@ async fn build_cpp(
                 ("CXXFLAGS", SANITIZE_UNDEFINED),
             ],
         },
+        #[cfg(not(target_arch = "x86_64"))]
+        // Disable afl++ asan builds on x86_64 for now: https://github.com/dergoegge/fuzzor/issues/4
         (FuzzEngine::AflPlusPlus, Sanitizer::Address) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
