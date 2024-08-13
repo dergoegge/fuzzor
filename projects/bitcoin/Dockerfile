@@ -5,9 +5,10 @@ ARG REPO=bitcoin
 ARG BRANCH=master
 ARG REVISION=
 
+ENV SOURCES_PATH=/depends_sources
+
 RUN git clone --depth 1 --branch $BRANCH https://github.com/$OWNER/$REPO.git
-RUN cd bitcoin/depends && make NO_QT=1 NO_BDB=1 NO_ZMQ=1 NO_UPNP=1 NO_NATPMP=1 NO_USDT=1 download-linux
-RUN mv bitcoin/depends/sources ./bitcoin_depends_sources
+RUN make -C bitcoin/depends NO_QT=1 NO_BDB=1 NO_ZMQ=1 NO_UPNP=1 NO_NATPMP=1 NO_USDT=1 download-linux SOURCES_PATH=$SOURCES_PATH
 
 RUN mv ./bitcoin/test/sanitizer_suppressions/ubsan ./ubsan_suppressions
 # No idea why this is needed but the existing file based suppression
