@@ -34,6 +34,6 @@ COPY ./config.yaml .
 COPY ./custom_comparator.c .
 
 RUN clang -shared -fPIC -o custom_comparator.so custom_comparator.c
-ENV SEMSAN_CUSTOM_COMPARATOR /workdir/custom_comparator.so
+ENV SEMSAN_CUSTOM_COMPARATOR=/workdir/custom_comparator.so
 
 RUN builder $PWD/config.yaml $PWD/build.sh $FUZZOR_HARNESSES
