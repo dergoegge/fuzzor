@@ -3,16 +3,16 @@
 set -ex
 
 if [[ $FUZZING_ENGINE =~ semsan_Custom[0-1] ]]; then
-  export CC=arm-linux-gnueabihf-gcc-14
-  export CXX=arm-linux-gnueabihf-g++-14
-  export LD=arm-linux-gnueabihf-gcc-14
-  export AR=arm-linux-gnueabihf-ar
+  export CC=arm-linux-gnueabihf-gcc-${GCC_V}
+  export CXX=arm-linux-gnueabihf-g++-${GCC_V}
+  export LD=arm-linux-gnueabihf-gcc-${GCC_V}
+  export AR=arm-linux-gnueabihf-gcc-ar-${GCC_V}
   export CMAKE_TOOLCHAIN_FILE=/toolchains/arm32.cmake
 elif [[ $FUZZING_ENGINE =~ semsan_Custom[2-3] ]]; then
-  export CC=x86_64-linux-gnu-gcc-14
-  export CXX=x86_64-linux-gnu-g++-14
-  export LD=x86_64-linux-gnu-gcc-14
-  export AR=x86_64-linux-gnu-ar
+  export CC=x86_64-linux-gnu-gcc-${GCC_V}
+  export CXX=x86_64-linux-gnu-g++-${GCC_V}
+  export LD=x86_64-linux-gnu-gcc-${GCC_V}
+  export AR=x86_64-linux-gnu-gcc-ar-${GCC_V}
   export CMAKE_TOOLCHAIN_FILE=/toolchains/x86_64.cmake
 fi
 
