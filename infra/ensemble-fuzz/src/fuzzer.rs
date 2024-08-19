@@ -157,6 +157,7 @@ impl Fuzzer for SemSanFuzzer {
             command.args(&["--comparator", &self.comparator]);
         }
         command.args(&["--timeout", "5000"]);
+        command.arg("--ignore-exit-kind");
         command.args(&[&self.primary_binary, &self.secondary_binary]);
         command.args(&[
             "fuzz",
