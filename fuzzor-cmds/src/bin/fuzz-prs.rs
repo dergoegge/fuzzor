@@ -207,7 +207,7 @@ impl PullRequestManager {
         let mut prs = Vec::new();
         let parent_config = self.parent_folder.config();
 
-        let mut page: u32 = 0;
+        let mut page: u32 = 1;
         'page_loop: loop {
             if let Ok(result) = self
                 .github
