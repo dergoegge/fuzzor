@@ -16,12 +16,16 @@ make -C depends DEBUG=1 NO_QT=1 NO_BDB=1 NO_ZMQ=1 NO_UPNP=1 NO_NATPMP=1 NO_USDT=
      AR=llvm-ar NM=llvm-nm RANLIB=llvm-ranlib STRIP=llvm-strip \
      CPPFLAGS="$CPPFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" -j$(nproc)
 
-./autogen.sh
 
-CONFIG_SITE="$PWD/depends/$(./depends/config.guess)/share/config.site" \
-  ./configure --enable-fuzz SANITIZER_LDFLAGS="$LIB_FUZZING_ENGINE"
+cmake -B build_fuzz \
+  --toolchain depends/$(./depends/config.guess)/toolchain.cmake \
+  `# Setting these flags to an empty string ensures that the flags set by an OSS-Fuzz environment remain unaltered` \
+  -DCMAKE_C_FLAGS_RELWITHDEBINFO="" \
+  -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="" \
+  -DBUILD_FOR_FUZZING=ON \
+  -DSANITIZER_LDFLAGS="$LIB_FUZZING_ENGINE"
 
-make -j$(nproc)
+cmake --build build_fuzz -j$(nproc)
 
 # Normally, fuzzor requires one binary per harness but Bitcoin Core gets a
 # carve out since creating individual binaries ends up with a giant image
@@ -29,12 +33,12 @@ make -j$(nproc)
 #
 # Fuzzor will use the FUZZ env variable to the select the active harness
 # (hopefully this can change once Bitcoin Core has CMake).
-cp ./src/test/fuzz/fuzz $OUT/
+cp ./build_fuzz/src/test/fuzz/fuzz $OUT/
 chmod +x $OUT/fuzz
 
 # Create an empty file for each harness in $OUT. Fuzzor uses this to get the
 # list of available harnesses.
-WRITE_ALL_FUZZ_TARGETS_AND_ABORT="/tmp/a" "./src/test/fuzz/fuzz" || true
+WRITE_ALL_FUZZ_TARGETS_AND_ABORT="/tmp/a" "./build_fuzz/src/test/fuzz/fuzz" || true
 readarray FUZZ_TARGETS < "/tmp/a"
 for fuzz_target in ${FUZZ_TARGETS[@]}; do
   touch "$OUT/$fuzz_target"
