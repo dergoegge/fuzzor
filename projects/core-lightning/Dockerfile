@@ -5,7 +5,6 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   automake \
   build-essential \
   ca-certificates \
-  curl \
   dirmngr \
   gettext \
   git \

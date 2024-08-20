@@ -1,7 +1,6 @@
 FROM fuzzor-base:latest
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-  wget \
   python3-venv \
   gcc-${GCC_V}-arm-linux-gnueabihf \
   g++-${GCC_V}-arm-linux-gnueabihf \
@@ -21,7 +20,7 @@ ARG REVISION=
 
 RUN git clone --depth 1 --branch $BRANCH https://github.com/$OWNER/$REPO.git
 RUN git clone https://github.com/guidovranken/cryptofuzz.git
-RUN wget https://archives.boost.io/release/1.84.0/source/boost_1_84_0.tar.bz2
+RUN curl https://archives.boost.io/release/1.84.0/source/boost_1_84_0.tar.bz2 -o boost_1_84_0.tar.bz2
 
 COPY ./build_boost.sh .
 RUN bash ./build_boost.sh # build and install boost
