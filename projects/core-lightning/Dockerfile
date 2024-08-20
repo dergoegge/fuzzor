@@ -1,19 +1,14 @@
 FROM fuzzor-base
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-  autoconf \
-  automake \
-  build-essential \
-  ca-certificates \
   dirmngr \
   gettext \
-  git \
   gnupg \
   libpq-dev \
   libtool \
   libffi-dev \
-  pkg-config \
   libssl-dev \
+  libsqlite3-dev \
   protobuf-compiler \
   python3.8 \
   python3-dev \
@@ -25,11 +20,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   libev-dev \
   libevent-dev \
   qemu-user-static \
-  wget \
-  clang-16 \
   jq
-
-# TODO clang-18 from base
 
 RUN pip3 install --break-system-packages --user grpcio-tools
 
