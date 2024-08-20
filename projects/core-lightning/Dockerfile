@@ -8,6 +8,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   libtool \
   libffi-dev \
   libssl-dev \
+  libsqlite3-dev \
   protobuf-compiler \
   python3.8 \
   python3-dev \
