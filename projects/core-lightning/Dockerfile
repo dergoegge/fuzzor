@@ -20,10 +20,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   libev-dev \
   libevent-dev \
   qemu-user-static \
-  clang-16 \
   jq
-
-# TODO clang-18 from base
 
 RUN pip3 install --break-system-packages --user grpcio-tools
 
