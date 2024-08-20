@@ -4,7 +4,7 @@ set -ex
 
 pushd lightning
 
-./configure --enable-fuzzing --disable-valgrind
+./configure --enable-fuzzing --disable-valgrind CC=clang CONFIGURATOR_CC=clang
 
 make -j$(nproc)
 
