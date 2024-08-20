@@ -45,9 +45,10 @@ const AFL_CLANG_CC: &str = "afl-clang-fast";
 const AFL_CLANG_CXX: &str = "afl-clang-fast++";
 const AFL_GCC_CC: &str = "afl-gcc-fast";
 const AFL_GCC_CXX: &str = "afl-g++-fast";
-const SANITIZE_UNDEFINED: &str = "-fsanitize=array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr";
+const SANITIZE_UNDEFINED_LD: &str = "-fsanitize=array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr";
+const SANITIZE_UNDEFINED: &str = "-fsanitize=array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr -O2";
 const SANITIZE_UNDEFINED_FUZZER: &str = "-fsanitize=fuzzer,array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr";
-const SANITIZE_UNDEFINED_FUZZER_NO_LINK: &str = "-fsanitize=fuzzer-no-link,array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr";
+const SANITIZE_UNDEFINED_FUZZER_NO_LINK: &str = "-fsanitize=fuzzer-no-link,array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr -O2";
 
 async fn build_cpp(
     script: &PathBuf,
@@ -115,14 +116,19 @@ async fn build_cpp(
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
             ld: AFL_CLANG_CC,
-            envs: &[("AFL_LLVM_CMPLOG", "1"), ("CCACHE_DIR", "/ccache_cmplog/")],
+            envs: &[
+                ("AFL_LLVM_CMPLOG", "1"),
+                ("CCACHE_DIR", "/ccache_cmplog/"),
+                ("CFLAGS", "-O2"),
+                ("CXXFLAGS", "-O2"),
+            ],
         },
         (FuzzEngine::AflPlusPlus, Sanitizer::Undefined) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
             ld: AFL_CLANG_CC,
             envs: &[
-                ("LIB_FUZZING_ENGINE", SANITIZE_UNDEFINED),
+                ("LIB_FUZZING_ENGINE", SANITIZE_UNDEFINED_LD),
                 ("CFLAGS", SANITIZE_UNDEFINED),
                 ("CXXFLAGS", SANITIZE_UNDEFINED),
             ],
@@ -137,6 +143,8 @@ async fn build_cpp(
                 ("AFL_USE_ASAN", "1"),
                 ("LDFLAGS", "-fuse-ld=lld"),
                 ("CCACHE_DIR", "/ccache_asan/"),
+                ("CFLAGS", "-O2"),
+                ("CXXFLAGS", "-O2"),
             ],
         },
         (FuzzEngine::LibFuzzer, Sanitizer::None) => BuildEnv {
@@ -145,8 +153,8 @@ async fn build_cpp(
             ld: "clang",
             envs: &[
                 ("LIB_FUZZING_ENGINE", "-fsanitize=fuzzer"),
-                ("CFLAGS", "-fsanitize=fuzzer-no-link"),
-                ("CXXFLAGS", "-fsanitize=fuzzer-no-link"),
+                ("CFLAGS", "-O2 -fsanitize=fuzzer-no-link"),
+                ("CXXFLAGS", "-O2 -fsanitize=fuzzer-no-link"),
             ],
         },
         (FuzzEngine::LibFuzzer, Sanitizer::Undefined) => BuildEnv {
@@ -165,8 +173,8 @@ async fn build_cpp(
             ld: "clang",
             envs: &[
                 ("LIB_FUZZING_ENGINE", "-fsanitize=fuzzer,address"),
-                ("CFLAGS", "-fsanitize=fuzzer-no-link,address"),
-                ("CXXFLAGS", "-fsanitize=fuzzer-no-link,address"),
+                ("CFLAGS", "-O2 -fsanitize=fuzzer-no-link,address"),
+                ("CXXFLAGS", "-O2 -fsanitize=fuzzer-no-link,address"),
             ],
         },
         (FuzzEngine::None, Sanitizer::Coverage) => BuildEnv {
@@ -174,10 +182,6 @@ async fn build_cpp(
             cxx: "clang++",
             ld: "clang",
             envs: &[
-                (
-                    "LIB_FUZZING_ENGINE",
-                    "-fprofile-instr-generate -fcoverage-mapping",
-                ),
                 ("CFLAGS", "-fprofile-instr-generate -fcoverage-mapping -O0"),
                 (
                     "CXXFLAGS",
