@@ -20,10 +20,10 @@ ARG REVISION=
 
 RUN git clone --depth 1 --branch $BRANCH https://github.com/$OWNER/$REPO.git
 RUN git clone https://github.com/guidovranken/cryptofuzz.git
-RUN curl https://archives.boost.io/release/1.84.0/source/boost_1_84_0.tar.bz2 -o boost_1_84_0.tar.bz2
-
-COPY ./build_boost.sh .
-RUN bash ./build_boost.sh # build and install boost
+RUN curl https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2 -o boost_1_86_0.tar.bz2 && \
+    tar jxf boost_1_86_0.tar.bz2 && \
+    cp -R boost_1_86_0/boost/ /usr/include/ && \
+    rm boost_1_86_0.tar.bz2
 
 COPY ./build.sh .
 COPY ./shmem.patch .
