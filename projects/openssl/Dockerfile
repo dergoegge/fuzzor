@@ -1,15 +1,5 @@
 FROM fuzzor-base:latest
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-  python3-venv \
-  gcc-${GCC_V}-arm-linux-gnueabihf \
-  g++-${GCC_V}-arm-linux-gnueabihf \
-  gcc-${GCC_V}-x86-64-linux-gnu \
-  g++-${GCC_V}-x86-64-linux-gnu
-
-# Avoid gcc version incompatability caused by apt upgrade
-RUN cd /AFLplusplus && make clean && make PERFORMANCE=1 -j$(nproc) install
-
 RUN cd /semsan && cargo install --features qemu_arm --bin semsan-arm --path .
 RUN cd /semsan && cargo install --features qemu_x86_64 --bin semsan-x86_64 --path .
 
