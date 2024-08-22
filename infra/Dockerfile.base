@@ -86,7 +86,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Install FlameGraph
 RUN git clone --depth 1 https://github.com/brendangregg/FlameGraph
-ENV FLAMEGRAPH_REPO=$PWD/FlameGraph
+ENV FLAMEGRAPH_REPO=/FlameGraph
 
 WORKDIR /types
 COPY ./types/Cargo.toml ./types/Cargo.lock .
@@ -98,42 +98,36 @@ WORKDIR /ensemble-fuzz
 COPY ./ensemble-fuzz/Cargo.toml ./ensemble-fuzz/Cargo.lock .
 RUN mkdir .cargo && cargo vendor > .cargo/config
 COPY ./ensemble-fuzz/src/ src
-RUN cargo build --release
 RUN cargo install --path . --verbose
 
 WORKDIR /reproducer
 COPY ./reproducer/Cargo.toml ./reproducer/Cargo.lock .
 RUN mkdir .cargo && cargo vendor > .cargo/config
 COPY ./reproducer/src/ src
-RUN cargo build --release
 RUN cargo install --path . --verbose
 
 WORKDIR /minimizer
 COPY ./minimizer/Cargo.toml ./minimizer/Cargo.lock .
 RUN mkdir .cargo && cargo vendor > .cargo/config
 COPY ./minimizer/src/ src
-RUN cargo build --release
 RUN cargo install --path . --verbose
 
 WORKDIR /builder
 COPY ./builder/Cargo.toml ./builder/Cargo.lock .
 RUN mkdir .cargo && cargo vendor > .cargo/config
 COPY ./builder/src/ src
-RUN cargo build --release
 RUN cargo install --path . --verbose
 
 WORKDIR /fuzzer
 COPY ./fuzzer/Cargo.toml ./fuzzer/Cargo.lock .
 RUN mkdir .cargo && cargo vendor > .cargo/config
 COPY ./fuzzer/src/ src
-RUN cargo build --release
 RUN cargo install --path . --verbose
 
 WORKDIR /coverage-reporter
 COPY ./coverage-reporter/Cargo.toml ./coverage-reporter/Cargo.lock .
 RUN mkdir .cargo && cargo vendor > .cargo/config
 COPY ./coverage-reporter/src/ src
-RUN cargo build --release
 RUN cargo install --path . --verbose
 
 RUN cargo install rustfilt
