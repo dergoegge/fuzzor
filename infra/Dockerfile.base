@@ -86,7 +86,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Install FlameGraph
 RUN git clone --depth 1 https://github.com/brendangregg/FlameGraph
-ENV FLAMEGRAPH_REPO=$PWD/FlameGraph
+ENV FLAMEGRAPH_REPO=/FlameGraph
 
 WORKDIR /types
 COPY ./types/Cargo.toml ./types/Cargo.lock .
