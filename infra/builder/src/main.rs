@@ -18,7 +18,6 @@ struct Options {
 struct BuildEnv<'a> {
     cc: &'a str,
     cxx: &'a str,
-    ld: &'a str,
     envs: &'a [(&'a str, &'a str)],
 }
 
@@ -27,7 +26,6 @@ impl<'a> BuildEnv<'a> {
         let mut envs = HashMap::new();
         envs.insert("CC", self.cc);
         envs.insert("CXX", self.cxx);
-        envs.insert("LD", self.ld);
 
         for (var, value) in self.envs.iter() {
             envs.insert(var, value);
@@ -61,61 +59,51 @@ async fn build_cpp(
         (FuzzEngine::SemSan, Sanitizer::SemSan(SemSanBuild::GccO0)) => BuildEnv {
             cc: AFL_GCC_CC,
             cxx: AFL_GCC_CXX,
-            ld: AFL_GCC_CC,
             envs: &[("CFLAGS", "-O0"), ("CXXFLAGS", "-O0")],
         },
         (FuzzEngine::SemSan, Sanitizer::SemSan(SemSanBuild::GccO1)) => BuildEnv {
             cc: AFL_GCC_CC,
             cxx: AFL_GCC_CXX,
-            ld: AFL_GCC_CC,
             envs: &[("CFLAGS", "-O1"), ("CXXFLAGS", "-O1")],
         },
         (FuzzEngine::SemSan, Sanitizer::SemSan(SemSanBuild::GccO2)) => BuildEnv {
             cc: AFL_GCC_CC,
             cxx: AFL_GCC_CXX,
-            ld: AFL_GCC_CC,
             envs: &[("CFLAGS", "-O2"), ("CXXFLAGS", "-O2")],
         },
         (FuzzEngine::SemSan, Sanitizer::SemSan(SemSanBuild::ClangO0)) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
-            ld: AFL_CLANG_CC,
             envs: &[("CFLAGS", "-O0"), ("CXXFLAGS", "-O0")],
         },
         (FuzzEngine::SemSan, Sanitizer::SemSan(SemSanBuild::ClangO1)) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
-            ld: AFL_CLANG_CC,
             envs: &[("CFLAGS", "-O1"), ("CXXFLAGS", "-O1")],
         },
         (FuzzEngine::SemSan, Sanitizer::SemSan(SemSanBuild::ClangO2)) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
-            ld: AFL_CLANG_CC,
             envs: &[("CFLAGS", "-O2"), ("CXXFLAGS", "-O2")],
         },
         (FuzzEngine::SemSan, Sanitizer::SemSan(_)) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
-            ld: AFL_CLANG_CC,
             envs: &[],
         },
         (FuzzEngine::SemSan, Sanitizer::None) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
-            ld: AFL_CLANG_CC,
             envs: &[],
         },
         (FuzzEngine::AflPlusPlus, Sanitizer::None) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
-            ld: AFL_CLANG_CC,
             envs: &[],
         },
         (FuzzEngine::AflPlusPlus, Sanitizer::CmpLog) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
-            ld: AFL_CLANG_CC,
             envs: &[
                 ("AFL_LLVM_CMPLOG", "1"),
                 ("CCACHE_DIR", "/ccache_cmplog/"),
@@ -126,7 +114,6 @@ async fn build_cpp(
         (FuzzEngine::AflPlusPlus, Sanitizer::Undefined) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
-            ld: AFL_CLANG_CC,
             envs: &[
                 ("LIB_FUZZING_ENGINE", SANITIZE_UNDEFINED_LD),
                 ("CFLAGS", SANITIZE_UNDEFINED),
@@ -138,10 +125,8 @@ async fn build_cpp(
         (FuzzEngine::AflPlusPlus, Sanitizer::Address) => BuildEnv {
             cc: AFL_CLANG_CC,
             cxx: AFL_CLANG_CXX,
-            ld: AFL_CLANG_CC,
             envs: &[
                 ("AFL_USE_ASAN", "1"),
-                ("LDFLAGS", "-fuse-ld=lld"),
                 ("CCACHE_DIR", "/ccache_asan/"),
                 ("CFLAGS", "-O2"),
                 ("CXXFLAGS", "-O2"),
@@ -150,7 +135,6 @@ async fn build_cpp(
         (FuzzEngine::LibFuzzer, Sanitizer::None) => BuildEnv {
             cc: "clang",
             cxx: "clang++",
-            ld: "clang",
             envs: &[
                 ("LIB_FUZZING_ENGINE", "-fsanitize=fuzzer"),
                 ("CFLAGS", "-O2 -fsanitize=fuzzer-no-link"),
@@ -160,7 +144,6 @@ async fn build_cpp(
         (FuzzEngine::LibFuzzer, Sanitizer::Undefined) => BuildEnv {
             cc: "clang",
             cxx: "clang++",
-            ld: "clang",
             envs: &[
                 ("LIB_FUZZING_ENGINE", SANITIZE_UNDEFINED_FUZZER),
                 ("CFLAGS", SANITIZE_UNDEFINED_FUZZER_NO_LINK),
@@ -170,7 +153,6 @@ async fn build_cpp(
         (FuzzEngine::LibFuzzer, Sanitizer::Address) => BuildEnv {
             cc: "clang",
             cxx: "clang++",
-            ld: "clang",
             envs: &[
                 ("LIB_FUZZING_ENGINE", "-fsanitize=fuzzer,address"),
                 ("CFLAGS", "-O2 -fsanitize=fuzzer-no-link,address"),
@@ -180,7 +162,6 @@ async fn build_cpp(
         (FuzzEngine::None, Sanitizer::Coverage) => BuildEnv {
             cc: "clang",
             cxx: "clang++",
-            ld: "clang",
             envs: &[
                 ("CFLAGS", "-fprofile-instr-generate -fcoverage-mapping -O0"),
                 (
