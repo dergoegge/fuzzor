@@ -22,11 +22,16 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   bsdmainutils \
   openssh-client \
   python3 \
+  python3-venv \
   ccache \
   rsync \
   cmake \
   libz3-dev \
   linux-perf \
+  gcc-${GCC_V}-arm-linux-gnueabihf \
+  g++-${GCC_V}-arm-linux-gnueabihf \
+  gcc-${GCC_V}-x86-64-linux-gnu \
+  g++-${GCC_V}-x86-64-linux-gnu \
   gcc-${GCC_V}-plugin-dev
 
 #RUN git clone https://github.com/rui314/mold.git
@@ -69,10 +74,11 @@ RUN rm -rf $(which ld) && ln -s $(which ld.lld) /usr/bin/ld
 #ENV MSAN_LIBCXX_PATH=/libcxx_msan
 
 # Clone AFLplusplus and build
-# this should come from our custom clang build?
-ENV LLVM_CONFIG=llvm-config
 RUN git clone --branch stable https://github.com/AFLplusplus/AFLplusplus
-RUN cd AFLplusplus && make PERFORMANCE=1 install -j$(nproc)
+RUN make -C AFLplusplus PERFORMANCE=1 \
+                        LLVM_CONFIG=llvm-config \
+                        install -j$(nproc) \
+    && rm -rf AFLplusplus
 
 # Install rust
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
