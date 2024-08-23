@@ -34,17 +34,19 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   g++-${GCC_V}-x86-64-linux-gnu \
   gcc-${GCC_V}-plugin-dev
 
-#RUN git clone https://github.com/rui314/mold.git
-#RUN mkdir mold/build && cd mold/build && \
-#  git checkout v2.3.1 && ../install-build-deps.sh && \
-#  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=c++ .. && \
-#  cmake --build . -j $(nproc) && cmake --build . --target install
+RUN git clone https://github.com/rui314/mold.git --depth 1 --branch v2.33.0
+RUN cmake -G Ninja -B /mold/build -S mold -DCMAKE_BUILD_TYPE=Release && \
+    ninja -C /mold/build/ "-j$(nproc)" install \
+    && rm -rf /mold
+
+# Force mold usage
+RUN rm -rf $(which ld) && ln -s $(which mold) /usr/bin/ld
 
 RUN git clone --depth 1 --branch "llvmorg-18.1.8" https://github.com/llvm/llvm-project.git
 
 # Build clang and runtimes
 RUN cmake -G Ninja -B /llvm-project/build/ \
-    -DLLVM_ENABLE_PROJECTS="clang;lld" \
+    -DLLVM_ENABLE_PROJECTS="clang" \
     -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_BINUTILS_INCDIR=/usr/include \
     -DLLVM_TARGETS_TO_BUILD=Native \
@@ -52,9 +54,6 @@ RUN cmake -G Ninja -B /llvm-project/build/ \
     -S /llvm-project/llvm \
   && ninja -C /llvm-project/build/ "-j$(nproc)" install \
   && rm -rf /llvm-project
-
-# TODO: This fixes weird compile issues. Why?
-RUN rm -rf $(which ld) && ln -s $(which ld.lld) /usr/bin/ld 
 
 # Build libc++ for MSan
 #RUN mkdir libcxx_msan && \
@@ -77,6 +76,8 @@ RUN rm -rf $(which ld) && ln -s $(which ld.lld) /usr/bin/ld
 RUN git clone --branch stable https://github.com/AFLplusplus/AFLplusplus
 RUN make -C AFLplusplus PERFORMANCE=1 \
                         LLVM_CONFIG=llvm-config \
+                        # actually mold
+                        AFL_REAL_LD=/usr/bin/ld \
                         install -j$(nproc) \
     && rm -rf AFLplusplus
 
