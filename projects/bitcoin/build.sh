@@ -6,8 +6,7 @@ pushd bitcoin
 
 # This build script is executed repeatedly. Make sure there are no left over
 # build artifacts from previous executions.
-rm -rf ./*
-git checkout .
+rm -rf build_fuzz
 
 # Build dependencies using the Bitcoin Core depends system.
 sed -i --regexp-extended '/.*rm -rf .*extract_dir.*/d' ./depends/funcs.mk  # Keep extracted source
