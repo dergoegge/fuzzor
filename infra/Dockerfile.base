@@ -42,7 +42,7 @@ RUN cmake -G Ninja -B /mold/build -S mold -DCMAKE_BUILD_TYPE=Release && \
 # Force mold usage
 RUN rm -rf $(which ld) && ln -s $(which mold) /usr/bin/ld
 
-RUN git clone --depth 1 --branch "llvmorg-18.1.8" https://github.com/llvm/llvm-project.git
+RUN git clone --depth 1 --branch "llvmorg-19.1.0" https://github.com/llvm/llvm-project.git
 
 # Build clang and runtimes
 RUN cmake -G Ninja -B /llvm-project/build/ \
