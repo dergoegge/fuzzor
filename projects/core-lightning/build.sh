@@ -4,7 +4,7 @@ set -ex
 
 pushd lightning
 
-./configure --enable-fuzzing --disable-valgrind CC=clang CONFIGURATOR_CC=clang
+./configure --enable-fuzzing --disable-valgrind CC=clang CONFIGURATOR_CC=clang CWARNFLAGS="-Wno-error=gnu-folding-constant"
 
 make -j$(nproc)
 
