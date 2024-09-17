@@ -24,8 +24,21 @@ pub struct DockerEnv {
 }
 
 impl DockerEnv {
-    pub async fn new(cores: Vec<u64>, params: EnvironmentParams) -> Self {
-        let docker = bollard::Docker::connect_with_socket_defaults().unwrap();
+    pub async fn new(
+        cores: Vec<u64>,
+        docker_daemon_addr: String,
+        params: EnvironmentParams,
+    ) -> Self {
+        let docker = bollard::Docker::connect_with_http(
+            &docker_daemon_addr,
+            120,
+            &bollard::ClientVersion {
+                minor_version: 1,
+                major_version: 44,
+            },
+        )
+        .map_err(|e| format!("Could not connect to docker daemon: {}", e))
+        .unwrap();
 
         let cpuset_cpus = cores
             .iter()
@@ -55,13 +68,43 @@ impl DockerEnv {
 
         let full_cmd = format!("{} && {} && {}", fuzz_cmd, minimizer_cmd, coverage_cmd);
 
+        if let Ok(registry) = std::env::var("FUZZOR_REGISTRY") {
+            // Pull the image from the registry set by the user and tag it for local use.
+
+            let from_image = format!("{}/{}", &registry, &params.docker_image);
+            let options = Some(bollard::image::CreateImageOptions {
+                from_image: from_image.as_str(),
+                tag: "latest",
+                ..Default::default()
+            });
+
+            let mut pull_stream = docker.create_image(options, None, None);
+
+            while let Some(output) = pull_stream.next().await {
+                match output {
+                    Ok(output) => log::trace!("pull image stream: {:?}", output),
+                    Err(e) => log::error!("pull image error: {:?}", e),
+                }
+            }
+
+            let tag_options = bollard::image::TagImageOptions {
+                repo: params.docker_image.as_str(),
+                tag: "latest",
+            };
+
+            docker
+                .tag_image(&format!("{}:latest", &from_image), Some(tag_options))
+                .await
+                .unwrap();
+        }
+
         let mut config = bollard::container::Config {
             image: Some(params.docker_image.clone()),
             tty: Some(true),
             working_dir: Some(String::from("/workdir")),
             cmd: Some(vec!["/bin/bash".to_string(), "-c".to_string(), full_cmd]),
             host_config: Some(bollard::secret::HostConfig {
-                privileged: Some(true), // TODO needed for perf, use seccomp options instead
+                privileged: Some(true), // for performance
                 cpuset_cpus: Some(cpuset_cpus),
                 tmpfs: Some(tmpfs),
                 ..Default::default()
@@ -377,11 +420,15 @@ impl Environment for DockerEnv {
 #[derive(Clone)]
 pub struct DockerEnvAllocator {
     cores: Cores,
+    docker_daemon_addr: String,
 }
 
 impl DockerEnvAllocator {
-    pub fn new(cores: Cores) -> Self {
-        Self { cores }
+    pub fn new(cores: Cores, docker_daemon_addr: String) -> Self {
+        Self {
+            cores,
+            docker_daemon_addr,
+        }
     }
 }
 
@@ -393,7 +440,7 @@ impl EnvironmentAllocator<DockerEnv> for DockerEnvAllocator {
         // Wait until cores become available
         let cores = self.cores.take_many(opts.cores as u32).await;
 
-        Ok(DockerEnv::new(cores, opts).await)
+        Ok(DockerEnv::new(cores, self.docker_daemon_addr.clone(), opts).await)
     }
 
     async fn free(&mut self, mut env: DockerEnv) -> bool {

@@ -159,9 +159,15 @@ async fn main() -> Result<(), String> {
         GithubRevisionSource::Branch(config.branch.clone().unwrap_or(String::from("master"))),
     );
 
-    let builder = DockerBuilder::new(cores.clone(), opts.cores_per_build as usize, None);
+    let builder = DockerBuilder::new(
+        cores.clone(),
+        opts.cores_per_build as usize,
+        None,
+        "tcp://127.0.0.1:2375".to_string(),
+    );
 
-    let docker_allocator = DockerEnvAllocator::new(cores.clone());
+    let docker_allocator =
+        DockerEnvAllocator::new(cores.clone(), "tcp://127.0.0.1:2375".to_string());
 
     let scheduler: Box<dyn CampaignScheduler + Send> = if let Some(harnesses) = opts.harnesses {
         Box::new(OneShotScheduler::new(

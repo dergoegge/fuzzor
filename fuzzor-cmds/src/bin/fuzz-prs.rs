@@ -195,7 +195,12 @@ impl PullRequestManager {
         let cores = self.cores.clone();
         let cores_per_build = self.opts.cores_per_build as usize;
 
-        let builder = DockerBuilder::new(cores, cores_per_build, None);
+        let builder = DockerBuilder::new(
+            cores,
+            cores_per_build,
+            None,
+            "tcp://127.0.0.1:2375".to_string(),
+        );
 
         tokio::spawn(async move {
             let (_quit_tx, quit_rx) = tokio::sync::mpsc::channel(16);
@@ -306,9 +311,15 @@ async fn main() -> Result<(), String> {
         GithubRevisionSource::Branch(config.branch.clone().unwrap_or(String::from("master"))),
     );
 
-    let builder = DockerBuilder::new(cores.clone(), opts.cores_per_build as usize, None);
+    let builder = DockerBuilder::new(
+        cores.clone(),
+        opts.cores_per_build as usize,
+        None,
+        "tcp://127.0.0.1:2375".to_string(),
+    );
 
-    let docker_allocator = DockerEnvAllocator::new(cores.clone());
+    let docker_allocator =
+        DockerEnvAllocator::new(cores.clone(), "tcp://127.0.0.1:2375".to_string());
     // Prioritize fuzzing harnesses that reach recently modified files but fall back to round
     // robin campaign scheduling when necessary.
     let scheduler = Box::new(CoverageBasedScheduler::with_round_robin_fallback(

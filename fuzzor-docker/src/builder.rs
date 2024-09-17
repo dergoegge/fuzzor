@@ -15,17 +15,24 @@ pub struct DockerBuilder {
     cores: Cores,
     num_builder_cores: usize,
     registry: Option<String>,
+    docker_daemon_addr: String,
 }
 
 impl DockerBuilder {
     /// Create a new DockerBuilder.
     ///
     /// If provided, images created are pushed to the provided registry.
-    pub fn new(cores: Cores, num_builder_cores: usize, registry: Option<String>) -> Self {
+    pub fn new(
+        cores: Cores,
+        num_builder_cores: usize,
+        registry: Option<String>,
+        docker_daemon_addr: String,
+    ) -> Self {
         Self {
             cores,
             num_builder_cores,
             registry,
+            docker_daemon_addr,
         }
     }
 }
@@ -173,8 +180,15 @@ where
     PD: ProjectDescription + Clone + Send + 'static,
 {
     async fn build(&mut self, folder: PD, revision: R) -> Result<ProjectBuild<R>, String> {
-        let docker = bollard::Docker::connect_with_socket_defaults()
-            .map_err(|e| format!("Could not connect to docker daemon: {}", e))?;
+        let docker = bollard::Docker::connect_with_http(
+            &self.docker_daemon_addr,
+            120,
+            &bollard::ClientVersion {
+                minor_version: 1,
+                major_version: 44,
+            },
+        )
+        .map_err(|e| format!("Could not connect to docker daemon: {}", e))?;
 
         let config = folder.config();
 
@@ -219,9 +233,6 @@ where
 
         log::trace!("Harnesses found in image '{}': {:?}", &tag, &harnesses);
 
-        Ok(ProjectBuild::new(
-            harnesses,
-            revision,
-        ))
+        Ok(ProjectBuild::new(harnesses, revision))
     }
 }
