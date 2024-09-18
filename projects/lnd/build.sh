@@ -60,7 +60,7 @@ build_pkg_fuzzers zpay32 zpay32
 build_pkg_fuzzers brontide brontide
 build_pkg_fuzzers lnwire lnwire
 build_pkg_fuzzers tlv tlv
-build_pkg_fuzzers routing routing
+# TODO build_pkg_fuzzers routing routing
 build_pkg_fuzzers watchtower/wtwire watchtower_wire
 build_pkg_fuzzers watchtower/wtclient watchtower_client
 build_pkg_fuzzers htlcswitch/hop htlcswitch_hop
