@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use fuzzor::{
-    env::Cores,
+    env::ResourcePool,
     project::{
         builder::{ProjectBuild, ProjectBuilder},
         description::ProjectDescription,
@@ -11,28 +11,27 @@ use fuzzor::{
 
 use futures_util::StreamExt;
 
+use crate::env::DockerMachine;
+
 pub struct DockerBuilder {
-    cores: Cores,
-    num_builder_cores: usize,
+    machines: ResourcePool<DockerMachine>,
     registry: Option<String>,
-    docker_daemon_addr: String,
 }
 
 impl DockerBuilder {
-    /// Create a new DockerBuilder.
-    ///
-    /// If provided, images created are pushed to the provided registry.
-    pub fn new(
-        cores: Cores,
-        num_builder_cores: usize,
-        registry: Option<String>,
-        docker_daemon_addr: String,
-    ) -> Self {
+    /// Create a new DockerBuilder
+    pub fn new(machines: ResourcePool<DockerMachine>) -> Self {
         Self {
-            cores,
-            num_builder_cores,
-            registry,
-            docker_daemon_addr,
+            machines,
+            registry: None,
+        }
+    }
+
+    /// Create a new DockerBuilder that pushes images to a registry
+    pub fn with_registry(machines: ResourcePool<DockerMachine>, registry: String) -> Self {
+        Self {
+            machines,
+            registry: Some(registry),
         }
     }
 }
@@ -180,8 +179,10 @@ where
     PD: ProjectDescription + Clone + Send + 'static,
 {
     async fn build(&mut self, folder: PD, revision: R) -> Result<ProjectBuild<R>, String> {
+        let machine = self.machines.take_one().await;
+
         let docker = bollard::Docker::connect_with_http(
-            &self.docker_daemon_addr,
+            &machine.daemon_addr,
             120,
             &bollard::ClientVersion {
                 minor_version: 1,
@@ -189,17 +190,23 @@ where
             },
         )
         .map_err(|e| format!("Could not connect to docker daemon: {}", e))?;
+        // TODO If we return here due to an error, we won't add the machine back to the pool
 
         let config = folder.config();
 
-        let cores = self.cores.take_many(self.num_builder_cores as u32).await;
         log::info!("Building image for project '{}'", config.name);
         let build_result = self
-            .build_image(&docker, &cores, folder.clone(), revision.commit_hash())
+            .build_image(
+                &docker,
+                &machine.cores,
+                folder.clone(),
+                revision.commit_hash(),
+            )
             .await;
-        self.cores.add_many(cores).await;
 
-        // This has to happen after freeing the cores.
+        self.machines.add_one(machine).await;
+
+        // This has to happen after freeing the machine.
         let (image_id, tag) = build_result?;
 
         if self.registry.is_some() {

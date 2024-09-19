@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use fuzzor::{
     corpora::VersionedOverwritingHerder,
-    env::Cores,
+    env::ResourcePool,
     project::{
         campaign::CampaignEvent,
         description::{InMemoryProjectFolder, ProjectDescription, ProjectFolder},
@@ -13,7 +13,10 @@ use fuzzor::{
         Project, ProjectEvent, ProjectOptions,
     },
 };
-use fuzzor_docker::{builder::DockerBuilder, env::DockerEnvAllocator};
+use fuzzor_docker::{
+    builder::DockerBuilder,
+    env::{DockerEnvAllocator, DockerMachine},
+};
 use fuzzor_github::{
     reporter::GitHubRepoSolutionReporter,
     revisions::{GitHubRepository, GitHubRevisionTracker, GithubRevisionSource},
@@ -21,11 +24,39 @@ use fuzzor_github::{
 
 use clap::Parser;
 use octocrab::Octocrab;
+use tokio::fs;
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+struct Infrastructure {
+    builders: Vec<DockerMachine>,
+    runners: Vec<DockerMachine>,
+    registry: Option<String>,
+}
 
 #[derive(Parser, Debug)]
 struct Options {
     #[arg(long = "project", help = "Project to fuzz", required = true)]
     project: String,
+
+    #[arg(
+        long = "infra-spec",
+        help = "Infrastructure specification file",
+        required = true
+    )]
+    infra_spec: PathBuf,
+
+    #[arg(
+        long = "report-repo",
+        help = "GitHub repository for bug reports",
+        required = true
+    )]
+    report_repo: String,
+    #[arg(
+        long = "report-repo-owner",
+        help = "Owner of the GitHub repository for bug reports",
+        required = true
+    )]
+    report_repo_owner: String,
 
     #[arg(long = "owner", help = "Overwrite the repo owner from the config")]
     owner: Option<String>,
@@ -43,18 +74,6 @@ struct Options {
     )]
     harnesses: Option<Vec<String>>,
 
-    #[arg(
-        long = "cores-per-build",
-        help = "Number of cores to use for builds",
-        default_value_t = 16
-    )]
-    cores_per_build: u64,
-    #[arg(
-        long = "cores-per-campaign",
-        help = "Number of cores to use for each campaign",
-        default_value_t = 16
-    )]
-    cores_per_campaign: u64,
     #[arg(
         long = "campaign-duration",
         help = "Campaign duration in CPU hours",
@@ -128,9 +147,16 @@ async fn main() -> Result<(), String> {
 
     let opts = Options::parse();
 
-    let access_token = std::env::var("FUZZOR_GH_TOKEN").unwrap();
+    let config = fs::read_to_string(&opts.infra_spec).await.unwrap();
+    let mut infra: Infrastructure = serde_yaml::from_str(&config).unwrap();
+    log::info!("{:?}", infra);
 
-    let cores = Cores::new(0..num_cpus::get() as u64);
+    let access_token = std::env::var("FUZZOR_GH_TOKEN").map_err(|_| {
+        String::from(
+            "You have to provide a GitHub auth token via the FUZZOR_GH_TOKEN env variable.",
+        )
+    })?;
+
     let mut folder = InMemoryProjectFolder::from_folder(
         ProjectFolder::new(PathBuf::from(format!("./projects/{}", opts.project))).unwrap(),
     );
@@ -159,20 +185,31 @@ async fn main() -> Result<(), String> {
         GithubRevisionSource::Branch(config.branch.clone().unwrap_or(String::from("master"))),
     );
 
-    let builder = DockerBuilder::new(
-        cores.clone(),
-        opts.cores_per_build as usize,
-        None,
-        "tcp://127.0.0.1:2375".to_string(),
-    );
+    let docker_machine_pool = ResourcePool::new(infra.runners.drain(..));
 
-    let docker_allocator =
-        DockerEnvAllocator::new(cores.clone(), "tcp://127.0.0.1:2375".to_string());
+    let builder_pool = if infra.builders.is_empty() {
+        // If no builders are configured, we use the runner pool (mostly useful when fuzzing on the
+        // same machine).
+        docker_machine_pool.clone()
+    } else {
+        ResourcePool::new(infra.builders.drain(..))
+    };
+
+    let docker_allocator = if let Some(registry) = infra.registry.clone() {
+        DockerEnvAllocator::with_registry(docker_machine_pool, registry)
+    } else {
+        DockerEnvAllocator::new(docker_machine_pool)
+    };
+
+    let builder = if let Some(registry) = infra.registry.clone() {
+        DockerBuilder::with_registry(builder_pool, registry)
+    } else {
+        DockerBuilder::new(builder_pool)
+    };
 
     let scheduler: Box<dyn CampaignScheduler + Send> = if let Some(harnesses) = opts.harnesses {
         Box::new(OneShotScheduler::new(
             folder.config(),
-            opts.cores_per_campaign,
             opts.campaign_duration,
             harnesses,
         ))
@@ -181,7 +218,6 @@ async fn main() -> Result<(), String> {
         // robin campaign scheduling when necessary.
         Box::new(CoverageBasedScheduler::with_round_robin_fallback(
             folder.config(),
-            opts.cores_per_campaign,
             opts.campaign_duration,
         ))
     };
@@ -211,16 +247,16 @@ async fn main() -> Result<(), String> {
     );
 
     let solution_monitor = SolutionReportingMonitor::new(GitHubRepoSolutionReporter::new(
-        "auto-fuzz",
-        "reports",
+        &opts.report_repo_owner,
+        &opts.report_repo,
         &access_token,
         config.ccs.clone(),
     ));
     project.register_monitor(Box::new(solution_monitor));
 
     let build_monitor = GitHubReportingBuildFailureMonitor::new(
-        "auto-fuzz",
-        "reports",
+        &opts.report_repo_owner,
+        &opts.report_repo,
         &access_token,
         config.ccs.clone(),
     );

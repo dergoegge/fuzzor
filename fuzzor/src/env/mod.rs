@@ -50,8 +50,6 @@ pub struct EnvironmentParams {
     pub docker_image: String,
     /// Requested architecture for the environment
     pub arch: Option<CpuArchitecture>,
-    /// Requested number of CPU cores for the environment
-    pub cores: u64,
     /// Name of the harness to be fuzzed
     pub harness_name: String,
     /// Fuzz duration in seconds

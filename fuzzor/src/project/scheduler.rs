@@ -31,8 +31,6 @@ pub struct RoundRobinCampaignScheduler {
     current_schedule: Vec<String>,
     // Index of the next harness to be returned from `current_schedule`
     next_harness: usize,
-    // Number of cores for each scheduled campaign
-    cores: u64,
     // Fuzz duration for each campaign
     duration: u64,
     // Config of the project that this schedule belongs to
@@ -44,11 +42,10 @@ pub struct RoundRobinCampaignScheduler {
 unsafe impl Send for RoundRobinCampaignScheduler {}
 
 impl RoundRobinCampaignScheduler {
-    pub fn new(project_config: ProjectConfig, cores: u64, duration: u64) -> Self {
+    pub fn new(project_config: ProjectConfig, duration: u64) -> Self {
         Self {
             current_schedule: Vec::new(),
             next_harness: 0,
-            cores,
             duration,
             unfinished: HashSet::new(),
             project_config,
@@ -73,7 +70,6 @@ impl CampaignScheduler for RoundRobinCampaignScheduler {
         Ok(EnvironmentParams {
             docker_image: format!("fuzzor-{}:latest", self.project_config.name),
             arch: None,
-            cores: self.cores,
             harness_name,
             duration: self.duration,
             project_config: self.project_config.clone(),
@@ -112,8 +108,6 @@ pub struct CoverageBasedScheduler {
     base_harnesses: Option<SharedHarnessMap>,
     // Current campaign schedule, the next harness is poped from the front.
     schedule: VecDeque<String>,
-    // Number of cores for each scheduled campaign
-    cores: u64,
     // Fuzz duration for each campaign
     duration: u64,
     // Config of the project that this schedule belongs to
@@ -125,14 +119,12 @@ pub struct CoverageBasedScheduler {
 impl CoverageBasedScheduler {
     pub fn new(
         project_config: ProjectConfig,
-        cores: u64,
         duration: u64,
         base_harnesses: SharedHarnessMap,
     ) -> Self {
         Self {
             base_harnesses: Some(base_harnesses),
             schedule: VecDeque::new(),
-            cores,
             duration,
             project_config,
             rr_scheduler: None,
@@ -143,17 +135,14 @@ impl CoverageBasedScheduler {
     /// with fuzzing the harnesses that reached the modified files.
     pub fn with_round_robin_fallback(
         project_config: ProjectConfig,
-        cores: u64,
         duration: u64,
     ) -> Self {
         Self {
             base_harnesses: None,
             schedule: VecDeque::new(),
-            cores,
             duration,
             rr_scheduler: Some(RoundRobinCampaignScheduler::new(
                 project_config.clone(),
-                cores,
                 duration,
             )),
 
@@ -169,7 +158,6 @@ impl CampaignScheduler for CoverageBasedScheduler {
             Some(harness_name) => Ok(EnvironmentParams {
                 docker_image: format!("fuzzor-{}:latest", self.project_config.name),
                 arch: None,
-                cores: self.cores,
                 harness_name,
                 duration: self.duration,
                 project_config: self.project_config.clone(),
@@ -278,22 +266,15 @@ pub struct OneShotScheduler {
     harnesses: Vec<String>,
     schedule: VecDeque<String>,
 
-    cores: u64,
     duration: u64,
     project_config: ProjectConfig,
 }
 
 impl OneShotScheduler {
-    pub fn new(
-        project_config: ProjectConfig,
-        cores: u64,
-        duration: u64,
-        harnesses: Vec<String>,
-    ) -> Self {
+    pub fn new(project_config: ProjectConfig, duration: u64, harnesses: Vec<String>) -> Self {
         Self {
             harnesses,
             schedule: VecDeque::new(),
-            cores,
             duration,
             project_config,
         }
@@ -307,7 +288,6 @@ impl CampaignScheduler for OneShotScheduler {
             Some(harness_name) => Ok(EnvironmentParams {
                 docker_image: format!("fuzzor-{}:latest", self.project_config.name),
                 arch: None,
-                cores: self.cores,
                 harness_name,
                 duration: self.duration,
                 project_config: self.project_config.clone(),

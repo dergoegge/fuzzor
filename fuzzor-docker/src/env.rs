@@ -1,3 +1,4 @@
+use serde;
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::PathBuf;
@@ -5,6 +6,7 @@ use std::path::PathBuf;
 use fuzzor::{
     env::{
         Cores, Environment, EnvironmentAllocationError, EnvironmentAllocator, EnvironmentParams,
+        ResourcePool,
     },
     solutions::Solution,
 };
@@ -18,19 +20,19 @@ pub const LIBFUZZER_STACK_TRACE_SUFFIX: &str = ".libfuzzer.crash";
 pub struct DockerEnv {
     docker: bollard::Docker,
     container_id: String,
-    cores: Vec<u64>,
+    machine: DockerMachine,
 
     params: EnvironmentParams,
 }
 
 impl DockerEnv {
     pub async fn new(
-        cores: Vec<u64>,
-        docker_daemon_addr: String,
+        machine: DockerMachine,
+        registry: Option<String>,
         params: EnvironmentParams,
     ) -> Self {
         let docker = bollard::Docker::connect_with_http(
-            &docker_daemon_addr,
+            &machine.daemon_addr,
             120,
             &bollard::ClientVersion {
                 minor_version: 1,
@@ -40,7 +42,8 @@ impl DockerEnv {
         .map_err(|e| format!("Could not connect to docker daemon: {}", e))
         .unwrap();
 
-        let cpuset_cpus = cores
+        let cpuset_cpus = machine
+            .cores
             .iter()
             .map(|c| c.to_string())
             .collect::<Vec<_>>()
@@ -68,10 +71,11 @@ impl DockerEnv {
 
         let full_cmd = format!("{} && {} && {}", fuzz_cmd, minimizer_cmd, coverage_cmd);
 
-        if let Ok(registry) = std::env::var("FUZZOR_REGISTRY") {
+        if let Some(registry) = registry {
             // Pull the image from the registry set by the user and tag it for local use.
 
             let from_image = format!("{}/{}", &registry, &params.docker_image);
+            log::info!("Pulling image='{}' on machine {:?}", from_image, machine);
             let options = Some(bollard::image::CreateImageOptions {
                 from_image: from_image.as_str(),
                 tag: "latest",
@@ -93,7 +97,7 @@ impl DockerEnv {
             };
 
             docker
-                .tag_image(&format!("{}:latest", &from_image), Some(tag_options))
+                .tag_image(&from_image, Some(tag_options))
                 .await
                 .unwrap();
         }
@@ -138,7 +142,7 @@ impl DockerEnv {
         Self {
             docker,
             container_id,
-            cores,
+            machine,
             params,
         }
     }
@@ -417,17 +421,30 @@ impl Environment for DockerEnv {
     }
 }
 
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct DockerMachine {
+    pub cores: Vec<u64>,
+    pub daemon_addr: String,
+}
+
 #[derive(Clone)]
 pub struct DockerEnvAllocator {
-    cores: Cores,
-    docker_daemon_addr: String,
+    machines: ResourcePool<DockerMachine>,
+    registry: Option<String>,
 }
 
 impl DockerEnvAllocator {
-    pub fn new(cores: Cores, docker_daemon_addr: String) -> Self {
+    pub fn new(machines: ResourcePool<DockerMachine>) -> Self {
         Self {
-            cores,
-            docker_daemon_addr,
+            machines,
+            registry: None,
+        }
+    }
+
+    pub fn with_registry(machines: ResourcePool<DockerMachine>, registry: String) -> Self {
+        Self {
+            machines,
+            registry: Some(registry),
         }
     }
 }
@@ -437,17 +454,14 @@ impl EnvironmentAllocator<DockerEnv> for DockerEnvAllocator {
         &mut self,
         opts: EnvironmentParams,
     ) -> Result<DockerEnv, EnvironmentAllocationError> {
-        // Wait until cores become available
-        let cores = self.cores.take_many(opts.cores as u32).await;
+        let machine = self.machines.take_one().await;
 
-        Ok(DockerEnv::new(cores, self.docker_daemon_addr.clone(), opts).await)
+        Ok(DockerEnv::new(machine, self.registry.clone(), opts).await)
     }
 
     async fn free(&mut self, mut env: DockerEnv) -> bool {
         env.shutdown().await;
-        self.cores
-            .add_many(env.cores.drain(..).collect::<Vec<_>>())
-            .await;
+        self.machines.add_one(env.machine).await;
         true
     }
 }

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use fuzzor::{
     corpora::VersionedOverwritingHerder,
-    env::Cores,
+    env::ResourcePool,
     project::{
         campaign::CampaignEvent,
         description::{InMemoryProjectFolder, ProjectDescription, ProjectFolder},
@@ -14,7 +14,10 @@ use fuzzor::{
         Project, ProjectEvent, ProjectOptions,
     },
 };
-use fuzzor_docker::{builder::DockerBuilder, env::DockerEnvAllocator};
+use fuzzor_docker::{
+    builder::DockerBuilder,
+    env::{DockerEnvAllocator, DockerMachine},
+};
 use fuzzor_github::{
     reporter::GitHubRepoSolutionReporter,
     revisions::{GitHubRepository, GitHubRevisionTracker, GithubRevisionSource},
@@ -85,7 +88,7 @@ impl ProjectMonitor for PullRequestMonitor {
 }
 
 struct PullRequestManager {
-    cores: Cores,
+    machines: ResourcePool<DockerMachine>,
     github: octocrab::Octocrab,
     allocator: DockerEnvAllocator,
     parent_folder: InMemoryProjectFolder,
@@ -100,7 +103,7 @@ unsafe impl Send for PullRequestManager {}
 
 impl PullRequestManager {
     fn new(
-        cores: Cores,
+        machines: ResourcePool<DockerMachine>,
         allocator: DockerEnvAllocator,
         parent_folder: InMemoryProjectFolder,
         parent_harnesses: SharedHarnessMap,
@@ -108,6 +111,7 @@ impl PullRequestManager {
         access_token: &str,
     ) -> Self {
         Self {
+            machines,
             github: Octocrab::builder()
                 .personal_token(access_token.to_string())
                 .build()
@@ -116,7 +120,6 @@ impl PullRequestManager {
             parent_folder,
             opts,
             parent_harnesses,
-            cores,
             access_token: access_token.to_string(),
             already_fuzzing: HashSet::new(),
         }
@@ -153,7 +156,6 @@ impl PullRequestManager {
 
         let scheduler = Box::new(CoverageBasedScheduler::new(
             folder.config(),
-            self.opts.cores_per_campaign,
             self.opts.campaign_duration,
             self.parent_harnesses.clone(),
         ));
@@ -192,15 +194,7 @@ impl PullRequestManager {
         ));
         project.register_monitor(Box::new(solution_monitor));
 
-        let cores = self.cores.clone();
-        let cores_per_build = self.opts.cores_per_build as usize;
-
-        let builder = DockerBuilder::new(
-            cores,
-            cores_per_build,
-            None,
-            "tcp://127.0.0.1:2375".to_string(),
-        );
+        let builder = DockerBuilder::new(self.machines.clone());
 
         tokio::spawn(async move {
             let (_quit_tx, quit_rx) = tokio::sync::mpsc::channel(16);
@@ -295,10 +289,23 @@ async fn main() -> Result<(), String> {
 
     let opts = Options::parse();
 
-    let cores = Cores::new(0..num_cpus::get() as u64);
+    let total_num_cpus = num_cpus::get() as u64;
+    if total_num_cpus % opts.cores_per_campaign != 0 {
+        return Err("cores-per-campaign has to be a multiple of total number of cpus".to_string());
+    }
+
     let folder = InMemoryProjectFolder::from_folder(
         ProjectFolder::new(PathBuf::from(format!("./projects/{}", opts.project))).unwrap(),
     );
+
+    let mut machines = Vec::new();
+    for i in 0..(total_num_cpus / opts.cores_per_campaign) {
+        machines.push(DockerMachine {
+            cores: (i..(i + opts.cores_per_campaign)).collect(),
+            daemon_addr: "tcp://127.0.0.1:2375".to_string(),
+        });
+    }
+    let machines = ResourcePool::new(machines.drain(..));
 
     let config = folder.config();
 
@@ -311,20 +318,13 @@ async fn main() -> Result<(), String> {
         GithubRevisionSource::Branch(config.branch.clone().unwrap_or(String::from("master"))),
     );
 
-    let builder = DockerBuilder::new(
-        cores.clone(),
-        opts.cores_per_build as usize,
-        None,
-        "tcp://127.0.0.1:2375".to_string(),
-    );
+    let builder = DockerBuilder::new(machines.clone());
 
-    let docker_allocator =
-        DockerEnvAllocator::new(cores.clone(), "tcp://127.0.0.1:2375".to_string());
+    let docker_allocator = DockerEnvAllocator::new(machines.clone());
     // Prioritize fuzzing harnesses that reach recently modified files but fall back to round
     // robin campaign scheduling when necessary.
     let scheduler = Box::new(CoverageBasedScheduler::with_round_robin_fallback(
         folder.config(),
-        opts.cores_per_base_campaign,
         opts.base_campaign_duration,
     ));
 
@@ -357,7 +357,7 @@ async fn main() -> Result<(), String> {
 
     let pr_mngr = PullRequestMonitor {
         pr_manager: Some(PullRequestManager::new(
-            cores.clone(),
+            machines,
             docker_allocator,
             folder.clone(),
             project.harnesses(),
