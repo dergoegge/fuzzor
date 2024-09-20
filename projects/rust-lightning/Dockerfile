@@ -1,11 +1,15 @@
 FROM fuzzor-base
 
+# Install rust
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y \
+    && rustup install nightly
+ENV PATH="/root/.cargo/bin:${PATH}"
+
 ARG OWNER=lightningdevkit
 ARG REPO=rust-lightning
 ARG BRANCH=main
 ARG REVISION=
 
-RUN rustup install nightly
 RUN git clone --depth 1 --branch $BRANCH https://github.com/$OWNER/$REPO.git
 RUN cd $REPO/fuzz && cargo update && cargo install --force cargo-fuzz
 

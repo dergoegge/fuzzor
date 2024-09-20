@@ -1,4 +1,55 @@
+FROM rust:1.81 AS rust_builder
+
+RUN cargo install rustfilt
+
+RUN git clone https://github.com/dergoegge/semsan.git
+RUN cd semsan && cargo install --path . --verbose
+
+WORKDIR /types
+COPY ./types/Cargo.toml ./types/Cargo.lock .
+RUN mkdir .cargo && cargo vendor > .cargo/config
+COPY ./types/src/ src
+RUN cargo build --release
+
+WORKDIR /ensemble-fuzz
+COPY ./ensemble-fuzz/Cargo.toml ./ensemble-fuzz/Cargo.lock .
+RUN mkdir .cargo && cargo vendor > .cargo/config
+COPY ./ensemble-fuzz/src/ src
+RUN cargo install --path . --verbose
+
+WORKDIR /reproducer
+COPY ./reproducer/Cargo.toml ./reproducer/Cargo.lock .
+RUN mkdir .cargo && cargo vendor > .cargo/config
+COPY ./reproducer/src/ src
+RUN cargo install --path . --verbose
+
+WORKDIR /minimizer
+COPY ./minimizer/Cargo.toml ./minimizer/Cargo.lock .
+RUN mkdir .cargo && cargo vendor > .cargo/config
+COPY ./minimizer/src/ src
+RUN cargo install --path . --verbose
+
+WORKDIR /builder
+COPY ./builder/Cargo.toml ./builder/Cargo.lock .
+RUN mkdir .cargo && cargo vendor > .cargo/config
+COPY ./builder/src/ src
+RUN cargo install --path . --verbose
+
+WORKDIR /fuzzer
+COPY ./fuzzer/Cargo.toml ./fuzzer/Cargo.lock .
+RUN mkdir .cargo && cargo vendor > .cargo/config
+COPY ./fuzzer/src/ src
+RUN cargo install --path . --verbose
+
+WORKDIR /coverage-reporter
+COPY ./coverage-reporter/Cargo.toml ./coverage-reporter/Cargo.lock .
+RUN mkdir .cargo && cargo vendor > .cargo/config
+COPY ./coverage-reporter/src/ src
+RUN cargo install --path . --verbose
+
 FROM debian:sid-slim
+
+COPY --from=rust_builder /usr/local/cargo/bin/* /usr/local/bin/
 
 ARG GCC_V=14
 ENV GCC_V=$GCC_V
@@ -81,61 +132,9 @@ RUN make -C AFLplusplus PERFORMANCE=1 \
                         install -j$(nproc) \
     && rm -rf AFLplusplus
 
-# Install rust
-RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
-
 # Install FlameGraph
 RUN git clone --depth 1 https://github.com/brendangregg/FlameGraph
 ENV FLAMEGRAPH_REPO=/FlameGraph
-
-WORKDIR /types
-COPY ./types/Cargo.toml ./types/Cargo.lock .
-RUN mkdir .cargo && cargo vendor > .cargo/config
-COPY ./types/src/ src
-RUN cargo build --release
-
-WORKDIR /ensemble-fuzz
-COPY ./ensemble-fuzz/Cargo.toml ./ensemble-fuzz/Cargo.lock .
-RUN mkdir .cargo && cargo vendor > .cargo/config
-COPY ./ensemble-fuzz/src/ src
-RUN cargo install --path . --verbose
-
-WORKDIR /reproducer
-COPY ./reproducer/Cargo.toml ./reproducer/Cargo.lock .
-RUN mkdir .cargo && cargo vendor > .cargo/config
-COPY ./reproducer/src/ src
-RUN cargo install --path . --verbose
-
-WORKDIR /minimizer
-COPY ./minimizer/Cargo.toml ./minimizer/Cargo.lock .
-RUN mkdir .cargo && cargo vendor > .cargo/config
-COPY ./minimizer/src/ src
-RUN cargo install --path . --verbose
-
-WORKDIR /builder
-COPY ./builder/Cargo.toml ./builder/Cargo.lock .
-RUN mkdir .cargo && cargo vendor > .cargo/config
-COPY ./builder/src/ src
-RUN cargo install --path . --verbose
-
-WORKDIR /fuzzer
-COPY ./fuzzer/Cargo.toml ./fuzzer/Cargo.lock .
-RUN mkdir .cargo && cargo vendor > .cargo/config
-COPY ./fuzzer/src/ src
-RUN cargo install --path . --verbose
-
-WORKDIR /coverage-reporter
-COPY ./coverage-reporter/Cargo.toml ./coverage-reporter/Cargo.lock .
-RUN mkdir .cargo && cargo vendor > .cargo/config
-COPY ./coverage-reporter/src/ src
-RUN cargo install --path . --verbose
-
-RUN cargo install rustfilt
-
-WORKDIR /
-RUN git clone https://github.com/dergoegge/semsan.git
-RUN cd semsan && cargo install --path . --verbose
 
 COPY ./toolchains toolchains
 

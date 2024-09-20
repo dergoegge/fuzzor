@@ -1,5 +1,10 @@
 FROM fuzzor-base:latest
 
+# Install rust
+RUN curl https://sh.rustup.rs -sSf | bash -s -- --default-toolchain 1.81.0 -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+RUN git clone https://github.com/dergoegge/semsan.git
 RUN cd /semsan && cargo install --features qemu_arm --bin semsan-arm --path .
 RUN cd /semsan && cargo install --features qemu_x86_64 --bin semsan-x86_64 --path .
 
