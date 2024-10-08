@@ -9,6 +9,9 @@ ccs:
 
 engines:
 - LibFuzzer
+- None
 sanitizers:
 - ValueProfile
+- Undefined
+- Coverage
 - None
