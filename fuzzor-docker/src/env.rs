@@ -1,11 +1,11 @@
-use serde;
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use fuzzor::{
     env::{
-        Cores, Environment, EnvironmentAllocationError, EnvironmentAllocator, EnvironmentParams,
+        Environment, EnvironmentAllocationError, EnvironmentAllocator, EnvironmentParams,
         ResourcePool,
     },
     solutions::Solution,
@@ -13,6 +13,7 @@ use fuzzor::{
 
 use futures_util::stream::StreamExt;
 use fuzzor_infra::{FuzzerStats, ReproducedSolution};
+use serde::{Deserialize, Serialize};
 
 pub const ENSEMBLE_DIR: &str = "/workdir/workspace";
 pub const LIBFUZZER_STACK_TRACE_SUFFIX: &str = ".libfuzzer.crash";
@@ -421,8 +422,33 @@ impl Environment for DockerEnv {
     }
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+fn deserialize_cores<'de, D>(deserializer: D) -> Result<Vec<u64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    parse_cores(&s).map_err(serde::de::Error::custom)
+}
+
+fn parse_cores(s: &str) -> Result<Vec<u64>, String> {
+    if s.contains('-') {
+        let parts: Vec<&str> = s.split('-').collect();
+        if parts.len() != 2 {
+            return Err("Invalid range format".to_string());
+        }
+        let start = u64::from_str(parts[0]).map_err(|e| e.to_string())?;
+        let end = u64::from_str(parts[1]).map_err(|e| e.to_string())?;
+        Ok((start..=end).collect())
+    } else {
+        s.split(',')
+            .map(|num| u64::from_str(num.trim()).map_err(|e| e.to_string()))
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DockerMachine {
+    #[serde(deserialize_with = "deserialize_cores")]
     pub cores: Vec<u64>,
     pub daemon_addr: String,
 }
