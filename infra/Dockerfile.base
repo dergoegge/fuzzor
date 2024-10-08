@@ -34,7 +34,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   g++-${GCC_V}-x86-64-linux-gnu \
   gcc-${GCC_V}-plugin-dev
 
-RUN git clone https://github.com/rui314/mold.git --depth 1 --branch v2.33.0
+RUN git clone https://github.com/rui314/mold.git --depth 1 --branch v2.34.1
 RUN cmake -G Ninja -B /mold/build -S mold -DCMAKE_BUILD_TYPE=Release && \
     ninja -C /mold/build/ "-j$(nproc)" install \
     && rm -rf /mold
