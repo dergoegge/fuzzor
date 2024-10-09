@@ -163,11 +163,15 @@ async fn build_cpp(
             cc: "clang",
             cxx: "clang++",
             envs: &[
-                ("CFLAGS", "-fprofile-instr-generate -fcoverage-mapping -O0"),
+                (
+                    "CFLAGS",
+                    "-fsanitize=fuzzer-no-link -fprofile-instr-generate -fcoverage-mapping -O0",
+                ),
                 (
                     "CXXFLAGS",
-                    "-fprofile-instr-generate -fcoverage-mapping -O0",
+                    "-fsanitize=fuzzer-no-link -fprofile-instr-generate -fcoverage-mapping -O0",
                 ),
+                ("LIB_FUZZING_ENGINE", "-fsanitize=fuzzer"),
             ],
         },
         (_, _) => return Ok(()),

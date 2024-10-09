@@ -31,26 +31,13 @@ async fn main() {
 
     // Run every input in the corpus once through the harness binary instrumented for coverage
     // reporting.
-    match config.language {
-        Language::Rust => {
-            tokio::process::Command::new(&coverage_bin)
-                .env("LLVM_PROFILE", "default.profraw")
-                .arg("-runs=1") // Rust coverage binary is compiled with LibFuzzer
-                .arg(&opts.corpus)
-                .kill_on_drop(true)
-                .status()
-                .await
-                .unwrap();
-        }
-        _ => {
-            tokio::process::Command::new(&coverage_bin)
-                .arg(&opts.corpus)
-                .kill_on_drop(true)
-                .status()
-                .await
-                .unwrap();
-        }
-    }
+    tokio::process::Command::new(&coverage_bin)
+        .arg("-runs=1") // Coverage binary is compiled with LibFuzzer
+        .arg(&opts.corpus)
+        .kill_on_drop(true)
+        .status()
+        .await
+        .unwrap();
 
     tokio::process::Command::new("llvm-profdata")
         .arg("merge")
