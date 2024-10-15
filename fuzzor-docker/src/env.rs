@@ -11,6 +11,7 @@ use fuzzor::{
     solutions::Solution,
 };
 
+use async_trait::async_trait;
 use futures_util::stream::StreamExt;
 use fuzzor_infra::{FuzzerStats, ReproducedSolution};
 use serde::{Deserialize, Serialize};
@@ -215,6 +216,7 @@ impl DockerEnv {
     }
 }
 
+#[async_trait]
 impl Environment for DockerEnv {
     async fn get_id(&self) -> String {
         self.container_id.clone()

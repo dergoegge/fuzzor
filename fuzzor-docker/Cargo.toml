@@ -10,6 +10,7 @@ fuzzor_infra = { path = "../infra/types", package = "types", version = "0.1.0"}
 
 tokio = { version = "1.37", features = ["full"] }
 futures-util = "0.3.30"
+async-trait = "0.1.80"
 
 bollard = { version = "0.16.0", features = ["buildkit"] }
 tar = "0.4.40"

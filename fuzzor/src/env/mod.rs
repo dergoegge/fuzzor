@@ -4,35 +4,34 @@ use std::sync::Arc;
 
 use crate::solutions::Solution;
 
+use async_trait::async_trait;
 use fuzzor_infra::{CpuArchitecture, FuzzerStats, ProjectConfig};
 use tokio::sync::{Mutex, Semaphore};
 
 /// Environment defines a generic environment for fuzzing campaigns.
+#[async_trait]
 pub trait Environment {
     /// Get environment identifier
-    fn get_id(&self) -> impl Future<Output = String> + Send;
+    async fn get_id(&self) -> String;
     /// Get fuzzer stats, aggregated over all fuzz instances that are running as part of the active
     /// campaign.
-    fn get_stats(&self) -> impl Future<Output = Result<FuzzerStats, String>> + Send;
+    async fn get_stats(&self) -> Result<FuzzerStats, String>;
     /// Get all fuzz solutions (crashes, timeouts, etc.) found so far
-    fn get_solutions(&self) -> impl Future<Output = Result<Vec<Solution>, String>> + Send;
+    async fn get_solutions(&self) -> Result<Vec<Solution>, String>;
     /// Get a tarball of the corpus
-    fn get_corpus(&self, minimize: bool) -> impl Future<Output = Result<Vec<u8>, String>> + Send;
+    async fn get_corpus(&self, minimize: bool) -> Result<Vec<u8>, String>;
     /// Get the names of the source files that were covered through fuzzing
-    fn get_covered_files(&self) -> impl Future<Output = Result<Vec<String>, String>> + Send;
+    async fn get_covered_files(&self) -> Result<Vec<String>, String>;
     /// Get the coverage report
-    fn get_coverage_report(&self) -> impl Future<Output = Result<Vec<u8>, String>> + Send;
+    async fn get_coverage_report(&self) -> Result<Vec<u8>, String>;
     /// Upload an initial corpus to the environment
-    fn upload_initial_corpus(
-        &self,
-        corpus: Vec<u8>,
-    ) -> impl Future<Output = Result<(), String>> + Send;
+    async fn upload_initial_corpus(&self, corpus: Vec<u8>) -> Result<(), String>;
     /// Start fuzzing in the environment
-    fn start(&mut self) -> impl Future<Output = Result<(), String>> + Send;
+    async fn start(&mut self) -> Result<(), String>;
     /// Shutdown the environment
-    fn shutdown(&mut self) -> impl Future<Output = bool> + Send;
+    async fn shutdown(&mut self) -> bool;
     /// Check if the environment is reachable
-    fn ping(&self) -> impl Future<Output = Result<bool, String>> + Send;
+    async fn ping(&self) -> Result<bool, String>;
 }
 
 /// EnvironmentAllocationError represents possible environment allocation errors
