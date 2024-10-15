@@ -692,6 +692,7 @@ dependencies = [
 name = "fuzzor-docker"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bollard",
  "env_logger",
  "futures-util",
