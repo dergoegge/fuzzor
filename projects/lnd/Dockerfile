@@ -12,3 +12,6 @@ COPY ./build.sh .
 
 RUN --mount=type=cache,target=/go-cache \
   builder $PWD/config.yaml $PWD/build.sh $FUZZOR_HARNESSES
+
+# Fuzzor uses out/libfuzzer to gather the harness list (this should change)
+RUN ln -s out/native_go out/libfuzzer

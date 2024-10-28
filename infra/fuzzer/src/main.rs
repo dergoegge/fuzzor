@@ -51,6 +51,7 @@ async fn main() -> Result<(), std::io::Error> {
                 FuzzEngine::LibFuzzer => "libfuzzer",
                 FuzzEngine::AflPlusPlus => "aflpp",
                 FuzzEngine::SemSan => "semsan",
+                FuzzEngine::NativeGo => "native-go",
             };
 
             command.arg(
@@ -68,6 +69,11 @@ async fn main() -> Result<(), std::io::Error> {
     let mut supported_fuzzers = Vec::new();
 
     let mut cores_assigned = 0;
+
+    if config.has_engine(&FuzzEngine::NativeGo) && num_cpus::get() > cores_assigned {
+        cores_assigned = num_cpus::get();
+        supported_fuzzers.push((FuzzEngine::NativeGo, Sanitizer::None));
+    }
 
     if config.has_engine(&FuzzEngine::SemSan) && num_cpus::get() > cores_assigned {
         if let Some(sanitizers) = &config.sanitizers {

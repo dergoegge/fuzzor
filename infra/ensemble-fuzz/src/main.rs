@@ -9,7 +9,9 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use ensemble::start_ensemble_task;
-use fuzzer::{recommended_aflpp_settings, AflppFuzzer, LibFuzzer, SemSanFuzzer, SharedFuzzer};
+use fuzzer::{
+    recommended_aflpp_settings, AflppFuzzer, LibFuzzer, NativeGoFuzzer, SemSanFuzzer, SharedFuzzer,
+};
 use options::EnsembleOptions;
 
 pub fn ensure_dir(path: PathBuf) -> PathBuf {
@@ -30,6 +32,7 @@ fn num_cores_requested(options: &EnsembleOptions) -> usize {
         options.libfuzzer_binary.is_some(),
         options.libfuzzer_ubsan_binary.is_some(),
         options.libfuzzer_asan_binary.is_some(),
+        options.native_go_binary.is_some(),
         options.libfuzzer_value_profile,
     ];
 
@@ -208,12 +211,26 @@ fn setup_semsan_instances(options: &EnsembleOptions, fuzzers: &mut Vec<SharedFuz
     }
 }
 
+fn setup_native_go_instances(options: &EnsembleOptions, fuzzers: &mut Vec<SharedFuzzer>) {
+    if let Some(binary) = &options.native_go_binary {
+        assert!(fuzzers.is_empty()); // native go fuzzing is not compatible with other engines
+
+        let workdir = options.workspace.join("native-go");
+
+        fuzzers.push(Arc::new(Mutex::new(NativeGoFuzzer::new(
+            binary.clone(),
+            workdir,
+        ))));
+    }
+}
+
 fn setup_fuzzers(options: &EnsembleOptions, cores_requested: usize) -> Vec<SharedFuzzer> {
     let mut fuzzers: Vec<SharedFuzzer> = Vec::new();
 
     setup_aflpp_instances(options, cores_requested, &mut fuzzers);
     setup_libfuzzer_instances(options, &mut fuzzers);
     setup_semsan_instances(options, &mut fuzzers);
+    setup_native_go_instances(options, &mut fuzzers);
 
     fuzzers
 }

@@ -18,51 +18,29 @@ export PATH=$PATH:/usr/local/go/bin:$PWD/go-118-fuzz-build
 
 go env -w GOCACHE=/go-cache
 
-git clone --depth 1 https://github.com/AdamKorcz/go-118-fuzz-build
-pushd go-118-fuzz-build
-go build
-popd
+lnd_packages=$(go list ./...)
 
-go get github.com/AdamKorcz/go-118-fuzz-build/testing
+for package in $lnd_packages; do
+  echo "Running fuzz tests for package: $package"
 
-build_pkg_fuzzers () {
-  path=$1
-  prefix=$2
-  pushd $path
+  # Remove the github prefix and replace "/" with "_"
+  binary_prefix=$(sed "s/github.com\/lightningnetwork\/lnd[\/]*//g" <<< "$package")
 
-  if [ -f ./go.mod ]; then
-    echo "Found Go module, adding github.com/AdamKorcz/go-118-fuzz-build/testing as dependency"
-    go get github.com/AdamKorcz/go-118-fuzz-build/testing
+  if [[ -z $binary_prefix ]]; then
+    continue
   fi
 
-  # Write the list of harnesses for this package to a file
-  git grep -h -e "func Fuzz.*(" | sed "s/func//g" | sed "s/(.*//g" > /tmp/harnesses
+  binary_prefix=fuzz_$(sed "s/\//_/g" <<< "$binary_prefix")
+  echo "binary prefix: $binary_prefix"
 
-  # Rename _test.go files, required by go-118-fuzz-build
-  for x in *_test.go ; do mv "$x" "${x%_test.go}_mv_fuzz.go" ; done
+  go test -c -fuzz=. $package -o ./$binary_prefix
+  fuzz_tests=$(./$binary_prefix -test.list . | grep ^Fuzz || true) # grep returns 1 if there are no finds
 
-  readarray FUZZ_TARGETS < "/tmp/harnesses"
-  for fuzz_target in ${FUZZ_TARGETS[@]}; do
-    # Build a fuzz binary for each harness
-    go-118-fuzz-build -o fuzz_$fuzz_target.a -func $fuzz_target github.com/lightningnetwork/lnd/$path
-    clang++ -o $OUT/"$prefix"_$fuzz_target fuzz_$fuzz_target.a -fsanitize=fuzzer
+  # Run each fuzz test
+  for fuzz_test in $fuzz_tests; do
+    echo "$PWD/$binary_prefix -test.run=$fuzz_test -test.fuzz=$fuzz_test -test.fuzzcachedir=\$1" > $OUT/${binary_prefix}_$fuzz_test
+    chmod +x $OUT/${binary_prefix}_$fuzz_test
   done
-
-  popd # $path
-}
-
-# Delete test package idiom tests. Otherwise we get errors like: "found
-# packages lnwire (accept_channel.go) and lnwire_test (message_mv_fuzz.go) in
-# /workdir/lnd/lnwire".
-rm $(git grep -e "package [a-zA-Z0-9]*_test" | sed "s/:.*//g")
-
-build_pkg_fuzzers zpay32 zpay32
-build_pkg_fuzzers brontide brontide
-build_pkg_fuzzers lnwire lnwire
-build_pkg_fuzzers tlv tlv
-# TODO build_pkg_fuzzers routing routing
-build_pkg_fuzzers watchtower/wtwire watchtower_wire
-build_pkg_fuzzers watchtower/wtclient watchtower_client
-build_pkg_fuzzers htlcswitch/hop htlcswitch_hop
+done
 
 popd # $REPO

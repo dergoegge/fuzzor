@@ -80,7 +80,25 @@ async fn main() -> Result<(), std::io::Error> {
             false
         };
 
-    if !afl_success && !libfuzzer_success {
+    // Native go fuzzing does not support minimization (like really???)
+    let native_go_success =
+        if config.has_engine(&FuzzEngine::LibFuzzer) && config.has_sanitizer(&Sanitizer::None) {
+            let status = Command::new("cp")
+                .args(vec![
+                    "-r",
+                    opts.input_corpus.as_os_str().to_str().unwrap(),
+                    opts.output_corpus.as_os_str().to_str().unwrap(),
+                ])
+                .kill_on_drop(true)
+                .status()
+                .await?;
+
+            status.success()
+        } else {
+            false
+        };
+
+    if !afl_success && !libfuzzer_success && !native_go_success {
         std::process::exit(1);
     }
 

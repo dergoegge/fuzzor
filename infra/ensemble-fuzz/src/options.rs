@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 pub struct EnsembleOptions {
+    /// AFL++ options
     #[arg(long = "aflpp-binary", help = "Specify a afl++ binary")]
     pub aflpp_binary: Option<PathBuf>,
     #[arg(long = "aflpp-cmplog-binary", help = "Specify a afl++ cmplog binary")]
@@ -20,6 +21,7 @@ pub struct EnsembleOptions {
     )]
     pub aflpp_occupy: bool,
 
+    /// LibFuzzer options
     #[arg(long = "libfuzzer-binary", help = "Specify a libFuzzer binary")]
     pub libfuzzer_binary: Option<PathBuf>,
     #[arg(
@@ -45,6 +47,7 @@ pub struct EnsembleOptions {
     )]
     pub libfuzzer_additional_cores: u64,
 
+    /// SemSan options
     #[arg(
         long = "semsan-binary",
         help = "Specify the binary for the primary SemSan harness"
@@ -63,6 +66,13 @@ pub struct EnsembleOptions {
         default_value_t = String::from("equal"),
     )]
     pub semsan_comparator: String,
+
+    /// Native Go options
+    #[arg(
+        long = "native-go-binary",
+        help = "Specify the binary for native go fuzzing"
+    )]
+    pub native_go_binary: Option<PathBuf>,
 
     #[arg(
         long = "sync-interval",
