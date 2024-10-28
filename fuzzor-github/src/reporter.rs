@@ -160,7 +160,7 @@ impl SolutionReporter for GitHubRepoSolutionReporter {
         };
 
         // Open issue
-        self.github
+        let issue_number = self.github
             .issues(&self.owner, &self.repo)
             .create(format!("{}: {} in `{}`", project, label, harness))
             .body(match solution.metadata() {
@@ -180,13 +180,15 @@ impl SolutionReporter for GitHubRepoSolutionReporter {
             .assignees(self.ccs.clone())
             .send()
             .await
-            .map_err(|e| format!("Could not create issue for new solution: {}", e))?;
+            .map_err(|e| format!("Could not create issue for new solution: {}", e))?
+            .number;
 
         log::info!(
-            "Reported solution ({}) to GitHub repo {}/{}",
+            "Reported solution ({}) to GitHub repo {}/{} (#{})",
             solution.id(),
             self.owner,
-            self.repo
+            self.repo,
+            issue_number
         );
         Ok(())
     }
