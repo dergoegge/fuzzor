@@ -8,7 +8,6 @@ ccs:
 - dergoegge
 
 engines:
-- LibFuzzer
+- NativeGo
 sanitizers:
 - None
-- ValueProfile

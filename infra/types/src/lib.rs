@@ -17,6 +17,7 @@ pub enum FuzzEngine {
     LibFuzzer,
     AflPlusPlus,
     SemSan,
+    NativeGo,
     None,
 }
 
@@ -182,6 +183,14 @@ pub fn get_harness_dir(
         (FuzzEngine::SemSan, Sanitizer::CmpLog) => None,
         (FuzzEngine::SemSan, Sanitizer::ValueProfile) => None,
         (FuzzEngine::SemSan, Sanitizer::SemSan(t)) => Some(format!("semsan_{:?}", t)),
+
+        (FuzzEngine::NativeGo, Sanitizer::None) => Some(String::from("native_go")),
+        (FuzzEngine::NativeGo, Sanitizer::Undefined) => None,
+        (FuzzEngine::NativeGo, Sanitizer::Address) => None,
+        (FuzzEngine::NativeGo, Sanitizer::Coverage) => None,
+        (FuzzEngine::NativeGo, Sanitizer::CmpLog) => None,
+        (FuzzEngine::NativeGo, Sanitizer::ValueProfile) => None,
+        (FuzzEngine::NativeGo, Sanitizer::SemSan(_)) => None,
 
         (FuzzEngine::None, Sanitizer::None) => None,
         (FuzzEngine::None, Sanitizer::Undefined) => None,
