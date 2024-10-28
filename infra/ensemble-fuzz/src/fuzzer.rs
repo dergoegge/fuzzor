@@ -26,18 +26,10 @@ pub trait Fuzzer {
     /// Get [`FuzzerStats`] for the instance
     async fn get_stats(&self) -> FuzzerStats;
 
-    /// Whether or not the fuzzer's corpus should be synced with the global corpus.
-    ///
-    /// Note: Disabling syncing mostly only makes sense for fuzz engines that do not support
-    /// pulling in new inputs found by other fuzzers at runtime.
-    fn should_sync_corpus(&self) -> bool {
-        true
-    }
-
     /// Path to the corpus that the fuzzer pushes new inputs to.
-    fn get_push_corpus(&self) -> PathBuf;
+    fn get_push_corpus(&self) -> Option<PathBuf>;
     /// Path to a corpus that the fuzzer pulls new inputs from.
-    fn get_pull_corpus(&self) -> PathBuf;
+    fn get_pull_corpus(&self) -> Option<PathBuf>;
     /// Path to a folder containing solutions found by the fuzzer.
     fn get_solutions(&self) -> Vec<PathBuf>;
 
@@ -93,14 +85,12 @@ impl Fuzzer for SemSanFuzzer {
         stats.unwrap_or(FuzzerStats::default())
     }
 
-    fn get_push_corpus(&self) -> PathBuf {
-        // TODO SemSan does not actually push new inputs here, maybe the push corpus should be
-        // optional?
-        self.seeds.clone()
+    fn get_push_corpus(&self) -> Option<PathBuf> {
+        None
     }
 
-    fn get_pull_corpus(&self) -> PathBuf {
-        self.pull_corpus.clone()
+    fn get_pull_corpus(&self) -> Option<PathBuf> {
+        Some(self.pull_corpus.clone())
     }
 
     fn get_solutions(&self) -> Vec<PathBuf> {
@@ -284,17 +274,20 @@ impl Fuzzer for AflppFuzzer {
         stats
     }
 
-    fn should_sync_corpus(&self) -> bool {
-        // Only the main instance (-M) of afl++ needs to be synced
-        self.id == 0
+    fn get_push_corpus(&self) -> Option<PathBuf> {
+        if self.id == 0 {
+            Some(self.out_dir.join(self.id.to_string()).join("queue"))
+        } else {
+            None
+        }
     }
 
-    fn get_push_corpus(&self) -> PathBuf {
-        self.out_dir.join(self.id.to_string()).join("queue")
-    }
-
-    fn get_pull_corpus(&self) -> PathBuf {
-        self.pull_corpus.clone()
+    fn get_pull_corpus(&self) -> Option<PathBuf> {
+        if self.id == 0 {
+            Some(self.pull_corpus.clone())
+        } else {
+            None
+        }
     }
 
     fn get_solutions(&self) -> Vec<PathBuf> {
@@ -600,12 +593,12 @@ impl Fuzzer for LibFuzzer {
         stats.unwrap_or(FuzzerStats::default())
     }
 
-    fn get_push_corpus(&self) -> PathBuf {
-        self.seeds.clone()
+    fn get_push_corpus(&self) -> Option<PathBuf> {
+        Some(self.seeds.clone())
     }
 
-    fn get_pull_corpus(&self) -> PathBuf {
-        self.seeds.clone()
+    fn get_pull_corpus(&self) -> Option<PathBuf> {
+        Some(self.seeds.clone())
     }
 
     fn get_solutions(&self) -> Vec<PathBuf> {

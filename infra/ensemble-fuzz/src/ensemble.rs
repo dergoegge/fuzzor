@@ -31,14 +31,14 @@ async fn ensemble_fuzzers(
 ) {
     for fuzzer in fuzzers.iter() {
         let fuzzer = fuzzer.lock().await;
-        if fuzzer.should_sync_corpus() {
-            sync_folders(fuzzer.get_push_corpus(), global_corpus.clone()).await;
+        if let Some(push_corpus) = fuzzer.get_push_corpus() {
+            sync_folders(push_corpus, global_corpus.clone()).await;
         }
     }
     for fuzzer in fuzzers.iter() {
         let fuzzer = fuzzer.lock().await;
-        if fuzzer.should_sync_corpus() {
-            sync_folders(global_corpus.clone(), fuzzer.get_pull_corpus()).await;
+        if let Some(pull_corpus) = fuzzer.get_pull_corpus() {
+            sync_folders(global_corpus.clone(), pull_corpus).await;
         }
     }
 
