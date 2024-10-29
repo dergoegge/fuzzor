@@ -44,7 +44,7 @@ pub struct NativeGoFuzzer {
     solutions: PathBuf,
     go_fuzz_cache_dir: PathBuf,
 
-    last_stats: Arc<Mutex<Option<FuzzerStats>>>,
+    last_stats: Arc<Mutex<FuzzerStats>>,
 }
 
 impl NativeGoFuzzer {
@@ -56,7 +56,7 @@ impl NativeGoFuzzer {
             binary,
             go_fuzz_cache_dir,
             solutions,
-            last_stats: Arc::new(Mutex::new(None)),
+            last_stats: Arc::new(Mutex::new(FuzzerStats::default())),
         }
     }
 
@@ -79,7 +79,7 @@ impl Fuzzer for NativeGoFuzzer {
 
     async fn get_stats(&self) -> FuzzerStats {
         let stats = self.last_stats.lock().await.clone();
-        stats.unwrap_or(FuzzerStats::default())
+        stats.clone()
     }
 
     fn get_push_corpus(&self) -> Option<PathBuf> {
@@ -127,7 +127,7 @@ impl Fuzzer for NativeGoFuzzer {
 
 fn spawn_native_go_log_parser(
     stderr_reader: BufReader<tokio::process::ChildStderr>,
-    last_stats: Arc<Mutex<Option<FuzzerStats>>>,
+    last_stats: Arc<Mutex<FuzzerStats>>,
     crash_dir: PathBuf,
 ) {
     let mut lines = stderr_reader.lines();
@@ -144,39 +144,19 @@ fn spawn_native_go_log_parser(
             let stats_regex =
                     regex::Regex::new(r"fuzz: elapsed: [0-9]*s, execs: [0-9]* \((?<execs_per_sec>[0-9]*)/sec\), new interesting: [0-9]* \(total: (?<corpus>[0-9]*)\).*")
                         .unwrap();
+            log::trace!("native-go: {}", line);
             let Some(caps) = stats_regex.captures(&line) else {
-                // e.g. Failing input written to testdata/fuzz/FuzzFoo/a878c3134fe0404d44eb1e662e5d8d4a24beb05c3d68354903670ff65513ff49
-                let crasher_regex =
-                    regex::Regex::new(r"Failing input written to (?<crash_path>.*)").unwrap();
-                if let Some(caps) = crasher_regex.captures(&line) {
-                    // Copy the crashing input to the solutions directory
-                    let crash_path = PathBuf::from(&caps["crash_path"]);
-                    let _ =
-                        std::fs::copy(&crash_path, crash_dir.join(crash_path.file_name().unwrap()));
-
-                    let mut stats = last_stats.lock().await;
-                    if let Some(stats) = stats.as_mut() {
-                        stats.saved_crashes += 1;
-                    } else {
-                        *stats = Some(FuzzerStats::default());
-                    }
-                }
-
                 continue;
             };
 
             let mut stats = last_stats.lock().await;
-            *stats = Some(FuzzerStats {
-                execs_per_sec: caps["execs_per_sec"].parse().unwrap_or(0.0),
-                corpus_count: caps["corpus"].parse().unwrap_or(0),
-                // Stability not available from native-go output :(
-                stability: None,
-                saved_hangs: 0, // TODO are there even hangs with native go fuzzing?
-                saved_crashes: stats
-                    .as_ref()
-                    .unwrap_or(&FuzzerStats::default())
-                    .saved_crashes,
-            });
+            stats.execs_per_sec = caps["execs_per_sec"].parse().unwrap_or(0.0);
+            stats.corpus_count = caps["corpus"].parse().unwrap_or(0);
+        }
+
+        if PathBuf::from("testdata/").exists() {
+            let mut stats = last_stats.lock().await;
+            stats.saved_crashes += 1;
         }
     });
 }
