@@ -82,7 +82,7 @@ async fn main() -> Result<(), std::io::Error> {
 
     // Native go fuzzing does not support minimization (like really???)
     let native_go_success =
-        if config.has_engine(&FuzzEngine::LibFuzzer) && config.has_sanitizer(&Sanitizer::None) {
+        if config.has_engine(&FuzzEngine::NativeGo) && config.has_sanitizer(&Sanitizer::None) {
             let status = Command::new("cp")
                 .args(vec![
                     "-r",
