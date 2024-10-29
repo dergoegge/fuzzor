@@ -1,0 +1,13 @@
+name: test-go
+
+owner: dergoegge
+repo: bitcoin
+branch: master
+
+language: Go
+ccs:
+- dergoegge
+engines:
+- NativeGo
+sanitizers:
+- None
