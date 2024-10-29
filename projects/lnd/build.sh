@@ -14,7 +14,7 @@ else
 fi
 
 rm -rf /usr/local/go && tar -C /usr/local -xzf go.tar.gz
-export PATH=$PATH:/usr/local/go/bin:$PWD/go-118-fuzz-build
+export PATH=$PATH:/usr/local/go/bin
 
 go env -w GOCACHE=/go-cache
 

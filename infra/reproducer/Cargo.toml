@@ -16,6 +16,7 @@ serde_with = { version = "3.8.1", features = ["base64"] }
 tokio = { version = "1.37", features = ["full"] }
 
 fuzzor_infra = { path = "../types", package = "types", version = "0.1.0"}
+regex = "1.11.1"
 
 [[bin]]
 name = "reproducer"

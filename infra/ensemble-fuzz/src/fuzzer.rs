@@ -145,19 +145,25 @@ fn spawn_native_go_log_parser(
                     regex::Regex::new(r"fuzz: elapsed: [0-9]*s, execs: [0-9]* \((?<execs_per_sec>[0-9]*)/sec\), new interesting: [0-9]* \(total: (?<corpus>[0-9]*)\).*")
                         .unwrap();
             let Some(caps) = stats_regex.captures(&line) else {
+                // e.g. Failing input written to testdata/fuzz/FuzzFoo/a878c3134fe0404d44eb1e662e5d8d4a24beb05c3d68354903670ff65513ff49
+                let crasher_regex =
+                    regex::Regex::new(r"Failing input written to (?<crash_path>.*)").unwrap();
+                if let Some(caps) = crasher_regex.captures(&line) {
+                    // Copy the crashing input to the solutions directory
+                    let crash_path = PathBuf::from(&caps["crash_path"]);
+                    let _ =
+                        std::fs::copy(&crash_path, crash_dir.join(crash_path.file_name().unwrap()));
+
+                    let mut stats = last_stats.lock().await;
+                    if let Some(stats) = stats.as_mut() {
+                        stats.saved_crashes += 1;
+                    } else {
+                        *stats = Some(FuzzerStats::default());
+                    }
+                }
+
                 continue;
             };
-
-            // e.g. Failing input written to testdata/fuzz/FuzzFoo/a878c3134fe0404d44eb1e662e5d8d4a24beb05c3d68354903670ff65513ff49
-            let crasher_regex =
-                regex::Regex::new(r"Failing input written to (?<crash_path>.*)").unwrap();
-            let mut new_crash = 0;
-            if let Some(caps) = crasher_regex.captures(&line) {
-                // Copy the crashing input to the solutions directory
-                let crash_path = PathBuf::from(&caps["crash_path"]);
-                let _ = std::fs::copy(&crash_path, crash_dir.join(crash_path.file_name().unwrap()));
-                new_crash = 1;
-            }
 
             let mut stats = last_stats.lock().await;
             *stats = Some(FuzzerStats {
@@ -169,8 +175,7 @@ fn spawn_native_go_log_parser(
                 saved_crashes: stats
                     .as_ref()
                     .unwrap_or(&FuzzerStats::default())
-                    .saved_crashes
-                    + new_crash,
+                    .saved_crashes,
             });
         }
     });

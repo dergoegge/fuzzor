@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Stdio;
 
@@ -266,6 +267,63 @@ async fn main() -> Result<(), std::io::Error> {
     let config: ProjectConfig = serde_yaml::from_str(&config).unwrap();
 
     let _ = tokio::fs::create_dir_all(&opts.output_dir).await;
+
+    if let Some(native_go_bin) = get_harness_binary(
+        &FuzzEngine::NativeGo,
+        &Sanitizer::None,
+        &opts.harness,
+        &config,
+    ) {
+        // Reproduce Go testcases that have been written to testdata/fuzz/<harness>/<testcase>.
+        let tmp_file =
+            std::env::temp_dir().join(Alphanumeric.sample_string(&mut rand::thread_rng(), 16));
+
+        let stderr = std::fs::File::create(&tmp_file).unwrap();
+        let stdout = stderr.try_clone().unwrap();
+        let host_env: HashMap<String, String> = std::env::vars().collect();
+
+        let status = tokio::process::Command::new("bash")
+            .args(vec![native_go_bin.to_str().unwrap(), "/tmp"])
+            .stdout(stdout)
+            .stderr(stderr)
+            .envs(host_env)
+            .kill_on_drop(true)
+            .status()
+            .await
+            .unwrap();
+
+        if !status.success() {
+            let trace = tokio::fs::read(&tmp_file).await.unwrap();
+            let trace_string = String::from_utf8(trace.clone()).unwrap();
+            let test_case_regex =
+                regex::Regex::new(r"(?m)failure while testing seed corpus entry: (?<test_case>.*)")
+                    .unwrap();
+            let Some(caps) = test_case_regex.captures(&trace_string) else {
+                eprintln!("Testcase file not found in trace");
+                return Ok(());
+            };
+
+            let test_case = PathBuf::from("testdata/fuzz").join(&caps["test_case"]);
+
+            let reproduced_solution = std::fs::File::create(
+                opts.output_dir
+                    .join(test_case.file_name().unwrap().to_str().unwrap()),
+            )
+            .unwrap();
+            serde_yaml::to_writer(
+                reproduced_solution,
+                &ReproducedSolution {
+                    code: 77,
+                    input: tokio::fs::read(&test_case).await.unwrap(),
+                    trace,
+                },
+            )
+            .unwrap();
+
+            tokio::fs::remove_file(&tmp_file).await.unwrap();
+            return Ok(());
+        }
+    }
 
     let mut repro_futures = futures::stream::FuturesUnordered::new();
     let mut repro_futures_differential = futures::stream::FuturesUnordered::new();
