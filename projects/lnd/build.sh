@@ -38,7 +38,7 @@ for package in $lnd_packages; do
 
   # Run each fuzz test
   for fuzz_test in $fuzz_tests; do
-    echo "$PWD/$binary_prefix -test.run=$fuzz_test -test.fuzz=$fuzz_test -test.fuzzcachedir=\$1" > $OUT/${binary_prefix}_$fuzz_test
+    echo "$PWD/$binary_prefix -test.run=\"^$fuzz_test\$\" -test.fuzz=\"^$fuzz_test\$\" -test.fuzzcachedir=\$1" > $OUT/${binary_prefix}_$fuzz_test
     chmod +x $OUT/${binary_prefix}_$fuzz_test
   done
 done
