@@ -39,6 +39,10 @@ RUN cmake -G Ninja -B /mold/build -S mold -DCMAKE_BUILD_TYPE=Release && \
     ninja -C /mold/build/ "-j$(nproc)" install \
     && rm -rf /mold
 
+RUN git clone https://github.com/google/honggfuzz.git
+RUN apt install libunwind-dev -y
+RUN cd honggfuzz && make -j$(nproc)
+
 # Force mold usage
 RUN rm -rf $(which ld) && ln -s $(which mold) /usr/bin/ld
 
