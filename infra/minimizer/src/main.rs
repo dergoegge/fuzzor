@@ -80,6 +80,35 @@ async fn main() -> Result<(), std::io::Error> {
             false
         };
 
+    let honggfuzz_success =
+        if config.has_engine(&FuzzEngine::HonggFuzz) && config.has_sanitizer(&Sanitizer::None) {
+            let hfuzz_binary = get_harness_binary(
+                &FuzzEngine::HonggFuzz,
+                &Sanitizer::None,
+                &opts.harness,
+                &config,
+            )
+            .unwrap();
+
+            let status = Command::new("honggfuzz")
+                .args(vec![
+                    "--input",
+                    opts.input_corpus.to_str().unwrap(),
+                    "--output",
+                    opts.output_corpus.to_str().unwrap(),
+                    "--minimize",
+                    "--",
+                    hfuzz_binary.to_str().unwrap(),
+                ])
+                .kill_on_drop(true)
+                .status()
+                .await?;
+
+            status.success()
+        } else {
+            false
+        };
+
     // Native go fuzzing does not support minimization (like really???)
     let native_go_success =
         if config.has_engine(&FuzzEngine::NativeGo) && config.has_sanitizer(&Sanitizer::None) {
@@ -98,7 +127,7 @@ async fn main() -> Result<(), std::io::Error> {
             false
         };
 
-    if !afl_success && !libfuzzer_success && !native_go_success {
+    if !afl_success && !libfuzzer_success && !native_go_success && !honggfuzz_success {
         std::process::exit(1);
     }
 

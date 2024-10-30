@@ -50,6 +50,7 @@ async fn main() -> Result<(), std::io::Error> {
                 FuzzEngine::None => panic!("Can't add FuzzEngine::None to ensemble-fuzz flags"),
                 FuzzEngine::LibFuzzer => "libfuzzer",
                 FuzzEngine::AflPlusPlus => "aflpp",
+                FuzzEngine::HonggFuzz => "honggfuzz",
                 FuzzEngine::SemSan => "semsan",
                 FuzzEngine::NativeGo => "native-go",
             };
@@ -112,6 +113,23 @@ async fn main() -> Result<(), std::io::Error> {
             // Allocate additional cores to libfuzzer if afl++ is not enabled
             if num_cpus::get() > cores_assigned {
                 command.arg("--libfuzzer-add-cores");
+                command.arg((num_cpus::get() - cores_assigned).to_string());
+            }
+        }
+    }
+
+    if config.has_engine(&FuzzEngine::HonggFuzz) && num_cpus::get() > cores_assigned {
+        supported_fuzzers.push((FuzzEngine::HonggFuzz, Sanitizer::None));
+        cores_assigned += 1;
+
+        // TODO honggfuzz sanitizers
+
+        if !config.has_engine(&FuzzEngine::AflPlusPlus)
+            && !config.has_engine(&FuzzEngine::LibFuzzer)
+        {
+            // Allocate additional cores to honggfuzz if afl++ and libfuzzer are not enabled
+            if num_cpus::get() > cores_assigned {
+                command.arg("--honggfuzz-add-cores");
                 command.arg((num_cpus::get() - cores_assigned).to_string());
             }
         }

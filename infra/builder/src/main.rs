@@ -159,6 +159,33 @@ async fn build_cpp(
                 ("CXXFLAGS", "-O2 -fsanitize=fuzzer-no-link,address"),
             ],
         },
+        (FuzzEngine::HonggFuzz, Sanitizer::None) => BuildEnv {
+            cc: "hfuzz-clang",
+            cxx: "hfuzz-clang++",
+            envs: &[
+                ("LIB_FUZZING_ENGINE", ""),
+                ("CFLAGS", "-O2"),
+                ("CXXFLAGS", "-O2"),
+            ],
+        },
+        //(FuzzEngine::HonggFuzz, Sanitizer::Undefined) => BuildEnv {
+        //    cc: "hfuzz-clang",
+        //    cxx: "hfuzz-clang++",
+        //    envs: &[
+        //        ("LIB_FUZZING_ENGINE", "-fsanitize=undefined"),
+        //        ("CFLAGS", "-O2 -fsanitize=undefined"),
+        //        ("CXXFLAGS", "-O2 -fsanitize=undefined"),
+        //    ],
+        //},
+        //(FuzzEngine::HonggFuzz, Sanitizer::Address) => BuildEnv {
+        //    cc: "hfuzz-clang",
+        //    cxx: "hfuzz-clang++",
+        //    envs: &[
+        //        ("LIB_FUZZING_ENGINE", "-fsanitize=address"),
+        //        ("CFLAGS", "-O2 -fsanitize=address"),
+        //        ("CXXFLAGS", "-O2 -fsanitize=address"),
+        //    ],
+        //},
         (FuzzEngine::None, Sanitizer::Coverage) => BuildEnv {
             cc: "clang",
             cxx: "clang++",
