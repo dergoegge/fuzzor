@@ -36,7 +36,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
 
 RUN git clone https://github.com/rui314/mold.git --depth 1 --branch v2.34.1
 RUN cmake -G Ninja -B /mold/build -S mold -DCMAKE_BUILD_TYPE=Release && \
-    ninja -C /mold/build/ "-j$(nproc)" install \
+    ninja -C /mold/build/ "-j$(nproc)" install/strip \
     && rm -rf /mold
 
 RUN git clone https://github.com/google/honggfuzz.git
