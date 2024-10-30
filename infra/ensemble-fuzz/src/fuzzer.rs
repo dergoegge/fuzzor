@@ -39,6 +39,83 @@ pub trait Fuzzer {
 
 pub type SharedFuzzer = Arc<Mutex<dyn Fuzzer + Send>>;
 
+pub struct HonggFuzzer {
+    binary: PathBuf,
+    corpus: PathBuf,
+    solutions: PathBuf,
+    num_threads: u64,
+
+    last_stats: Arc<Mutex<FuzzerStats>>,
+}
+
+impl HonggFuzzer {
+    pub fn new(binary: PathBuf, workspace: PathBuf, num_threads: u64) -> Self {
+        Self {
+            binary,
+            corpus: workspace.join("corpus"),
+            solutions: workspace.join("solutions"),
+            num_threads,
+
+            last_stats: Arc::new(Mutex::new(FuzzerStats::default())),
+        }
+    }
+}
+
+#[async_trait]
+impl Fuzzer for HonggFuzzer {
+    fn get_name(&self) -> &str {
+        "honggfuzz"
+    }
+
+    fn get_instance_name(&self) -> String {
+        self.get_name().to_string()
+    }
+
+    async fn get_stats(&self) -> FuzzerStats {
+        let stats = self.last_stats.lock().await.clone();
+        stats.clone()
+    }
+
+    fn get_push_corpus(&self) -> Option<PathBuf> {
+        Some(self.corpus.clone())
+    }
+    fn get_pull_corpus(&self) -> Option<PathBuf> {
+        None
+    }
+
+    fn get_solutions(&self) -> Vec<PathBuf> {
+        vec![self.solutions.clone()]
+    }
+
+    fn start(&mut self) -> tokio::process::Child {
+        let _ = std::fs::create_dir_all(&self.corpus);
+        let _ = std::fs::create_dir_all(&self.solutions);
+
+        let num_threads_str = self.num_threads.to_string();
+        let args = vec![
+            "--input",
+            self.corpus.to_str().unwrap(),
+            "--crashdir",
+            self.solutions.to_str().unwrap(),
+            "--threads",
+            num_threads_str.as_str(),
+            "--",
+            self.binary.to_str().unwrap(),
+        ];
+
+        let host_env: HashMap<String, String> = std::env::vars().collect();
+
+        tokio::process::Command::new("honggfuzz")
+            .args(&args)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .envs(host_env)
+            .kill_on_drop(true)
+            .spawn()
+            .expect("Could not start honggfuzz instance")
+    }
+}
+
 pub struct NativeGoFuzzer {
     binary: PathBuf,
     solutions: PathBuf,

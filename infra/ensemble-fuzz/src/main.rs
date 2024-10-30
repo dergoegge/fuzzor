@@ -10,7 +10,8 @@ use tokio::sync::Mutex;
 
 use ensemble::start_ensemble_task;
 use fuzzer::{
-    recommended_aflpp_settings, AflppFuzzer, LibFuzzer, NativeGoFuzzer, SemSanFuzzer, SharedFuzzer,
+    recommended_aflpp_settings, AflppFuzzer, HonggFuzzer, LibFuzzer, NativeGoFuzzer, SemSanFuzzer,
+    SharedFuzzer,
 };
 use options::EnsembleOptions;
 
@@ -33,11 +34,13 @@ fn num_cores_requested(options: &EnsembleOptions) -> usize {
         options.libfuzzer_ubsan_binary.is_some(),
         options.libfuzzer_asan_binary.is_some(),
         options.native_go_binary.is_some(),
+        options.honggfuzz_binary.is_some(),
         options.libfuzzer_value_profile,
     ];
 
     cores.into_iter().filter(|b| *b).count()
         + options.libfuzzer_additional_cores as usize
+        + options.honggfuzz_additional_cores as usize
         + options.semsan_secondary_binaries.len()
 }
 
@@ -224,11 +227,24 @@ fn setup_native_go_instances(options: &EnsembleOptions, fuzzers: &mut Vec<Shared
     }
 }
 
+fn setup_honggfuzz_instances(options: &EnsembleOptions, fuzzers: &mut Vec<SharedFuzzer>) {
+    if let Some(binary) = options.honggfuzz_binary.as_ref() {
+        let workspace = options.workspace.join("honggfuzz");
+
+        fuzzers.push(Arc::new(Mutex::new(HonggFuzzer::new(
+            binary.clone(),
+            workspace,
+            options.honggfuzz_additional_cores + 1,
+        ))));
+    }
+}
+
 fn setup_fuzzers(options: &EnsembleOptions, cores_requested: usize) -> Vec<SharedFuzzer> {
     let mut fuzzers: Vec<SharedFuzzer> = Vec::new();
 
     setup_aflpp_instances(options, cores_requested, &mut fuzzers);
     setup_libfuzzer_instances(options, &mut fuzzers);
+    setup_honggfuzz_instances(options, &mut fuzzers);
     setup_semsan_instances(options, &mut fuzzers);
     setup_native_go_instances(options, &mut fuzzers);
 

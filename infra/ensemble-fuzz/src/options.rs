@@ -74,6 +74,16 @@ pub struct EnsembleOptions {
     )]
     pub native_go_binary: Option<PathBuf>,
 
+    /// Honggfuzz options
+    #[arg(long = "honggfuzz-binary", help = "Specify a honggfuzz binary")]
+    pub honggfuzz_binary: Option<PathBuf>,
+    #[arg(
+        long = "honggfuzz-add-cores",
+        help = "Number of additional honggfuzz cores",
+        default_value_t = 0
+    )]
+    pub honggfuzz_additional_cores: u64,
+
     #[arg(
         long = "sync-interval",
         help = "Time between corpus syncs in seconds",
