@@ -48,8 +48,11 @@ RUN rm -rf $(which ld) && ln -s $(which mold) /usr/bin/ld
 
 RUN git clone --depth 1 --branch "llvmorg-19.1.1" https://github.com/llvm/llvm-project.git
 
+ENV CCACHE_DIR /ccache
 # Build clang and runtimes
-RUN cmake -G Ninja -B /llvm-project/build/ \
+RUN --mount=type=cache,target=/ccache/ \
+    cmake -G Ninja -B /llvm-project/build/ \
+    -DLLVM_CCACHE_BUILD=ON \
     -DLLVM_ENABLE_PROJECTS="clang" \
     -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_BINUTILS_INCDIR=/usr/include \
