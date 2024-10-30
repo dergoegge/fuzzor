@@ -10,6 +10,7 @@ ccs:
 engines:
 - LibFuzzer
 - AflPlusPlus
+- HonggFuzz
 - None
 sanitizers:
 - Address
