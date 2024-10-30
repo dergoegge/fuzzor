@@ -59,7 +59,7 @@ RUN --mount=type=cache,target=/ccache/ \
     -DLLVM_TARGETS_TO_BUILD=Native \
     -DLLVM_ENABLE_RUNTIMES="compiler-rt;libcxx;libcxxabi;libunwind" \
     -S /llvm-project/llvm \
-  && ninja -C /llvm-project/build/ "-j$(nproc)" install \
+  && ninja -C /llvm-project/build/ "-j$(nproc)" install/strip \
   && rm -rf /llvm-project
 
 # Build libc++ for MSan
