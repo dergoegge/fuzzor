@@ -3,6 +3,9 @@ name = "reproducer"
 version = "0.1.0"
 edition = "2021"
 
+[profile.release]
+strip = "symbols"
+
 [dependencies]
 
 clap = { version = "4.5.4", features = ["derive", "string"] }
