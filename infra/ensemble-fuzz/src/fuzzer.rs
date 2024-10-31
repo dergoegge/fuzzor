@@ -103,7 +103,7 @@ impl Fuzzer for HonggFuzzer {
 
         // TODO there must be a more elegant way to get the stats
         let mut tail_stats_proc = tokio::process::Command::new("tail")
-            .args(vec!["-f", stats_file.to_str().unwrap()])
+            .args(vec!["--follow", "--retry", stats_file.to_str().unwrap()])
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .kill_on_drop(true)
