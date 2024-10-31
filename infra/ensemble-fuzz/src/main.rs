@@ -33,6 +33,7 @@ fn num_cores_requested(options: &EnsembleOptions) -> usize {
         options.libfuzzer_binary.is_some(),
         options.libfuzzer_ubsan_binary.is_some(),
         options.libfuzzer_asan_binary.is_some(),
+        options.libfuzzer_msan_binary.is_some(),
         options.native_go_binary.is_some(),
         options.honggfuzz_binary.is_some(),
         options.libfuzzer_value_profile,
@@ -170,6 +171,7 @@ fn setup_libfuzzer_instances(options: &EnsembleOptions, fuzzers: &mut Vec<Shared
         let sanitizer_bins = vec![
             ("ubsan", options.libfuzzer_ubsan_binary.clone()),
             ("asan", options.libfuzzer_asan_binary.clone()),
+            ("msan", options.libfuzzer_msan_binary.clone()),
         ];
 
         for (name, bin) in sanitizer_bins.iter() {

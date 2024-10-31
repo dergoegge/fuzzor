@@ -59,25 +59,26 @@ RUN --mount=type=cache,target=/ccache/ \
     -DLLVM_TARGETS_TO_BUILD=Native \
     -DLLVM_ENABLE_RUNTIMES="compiler-rt;libcxx;libcxxabi;libunwind" \
     -S /llvm-project/llvm \
-  && ninja -C /llvm-project/build/ "-j$(nproc)" install/strip \
+  && ninja -C /llvm-project/build/ "-j$(nproc)" install/strip
+
+# Build a memory sanitizer instrumented libc++
+RUN --mount=type=cache,target=/ccache/ \
+  mkdir libcxx_msan && \
+  cmake -G Ninja -B /libcxx_msan \
+    -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi;libunwind' \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DLLVM_USE_SANITIZER=MemoryWithOrigins \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DLLVM_TARGETS_TO_BUILD=Native \
+    -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF \
+    -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
+    -DLIBCXX_HARDENING_MODE=debug \
+    -S /llvm-project/runtimes \
+  && ninja -C /libcxx_msan "-j$(nproc)" \
   && rm -rf /llvm-project
 
-# Build libc++ for MSan
-#RUN mkdir libcxx_msan && \
-#  cmake -G Ninja -B /libcxx_msan \
-#    -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi;libunwind' \
-#    -DCMAKE_BUILD_TYPE=Release \
-#    -DLLVM_USE_SANITIZER=MemoryWithOrigins \
-#    -DCMAKE_C_COMPILER=clang \
-#    -DCMAKE_CXX_COMPILER=clang++ \
-#    -DLLVM_TARGETS_TO_BUILD=Native \
-#    -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF \
-#    -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
-#    -DLIBCXX_HARDENING_MODE=debug \
-#    -S /llvm-project/runtimes \
-#  && ninja -C /libcxx_msan "-j$(nproc)" 
-#
-#ENV MSAN_LIBCXX_PATH=/libcxx_msan
+ENV MSAN_LIBCXX_PATH=/libcxx_msan
 
 # Clone AFLplusplus and build
 RUN git clone --branch stable https://github.com/AFLplusplus/AFLplusplus

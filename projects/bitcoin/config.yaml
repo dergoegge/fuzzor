@@ -15,6 +15,7 @@ engines:
 sanitizers:
 - Address
 - Undefined
+- Memory
 - Coverage
 - CmpLog
 - ValueProfile

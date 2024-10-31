@@ -132,6 +132,14 @@ async fn build_cpp(
                 ("CXXFLAGS", "-O2"),
             ],
         },
+        (FuzzEngine::AflPlusPlus, Sanitizer::Memory) => BuildEnv {
+            cc: AFL_CLANG_CC,
+            cxx: AFL_CLANG_CXX,
+            envs: &[
+                ("CFLAGS", "-fsanitize=memory,fuzzer-no-link -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -g -O1 -fno-optimize-sibling-calls"),
+                ("CXXFLAGS", "-fsanitize=memory,fuzzer-no-link -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -g -O1 -fno-optimize-sibling-calls -nostdinc++ -nostdlib++ -isystem /libcxx_msan/include/c++/v1 -L/libcxx_msan/lib -Wl,-rpath,/libcxx_msan/lib -lc++ -lc++abi -lpthread -Wno-unused-command-line-argument"),
+            ],
+        },
         (FuzzEngine::LibFuzzer, Sanitizer::None) => BuildEnv {
             cc: "clang",
             cxx: "clang++",
@@ -157,6 +165,15 @@ async fn build_cpp(
                 ("LIB_FUZZING_ENGINE", "-fsanitize=fuzzer,address"),
                 ("CFLAGS", "-O2 -fsanitize=fuzzer-no-link,address"),
                 ("CXXFLAGS", "-O2 -fsanitize=fuzzer-no-link,address"),
+            ],
+        },
+        (FuzzEngine::LibFuzzer, Sanitizer::Memory) => BuildEnv {
+            cc: "clang",
+            cxx: "clang++",
+            envs: &[
+                ("LIB_FUZZING_ENGINE", "-fsanitize=fuzzer,memory"),
+                ("CFLAGS", "-fsanitize=memory,fuzzer-no-link -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -g -O1 -fno-optimize-sibling-calls"),
+                ("CXXFLAGS", "-fsanitize=memory,fuzzer-no-link -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -g -O1 -fno-optimize-sibling-calls -nostdinc++ -nostdlib++ -isystem /libcxx_msan/include/c++/v1 -L/libcxx_msan/lib -Wl,-rpath,/libcxx_msan/lib -lc++ -lc++abi -lpthread -Wno-unused-command-line-argument"),
             ],
         },
         (FuzzEngine::HonggFuzz, Sanitizer::None) => BuildEnv {

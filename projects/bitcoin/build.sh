@@ -16,6 +16,11 @@ make -C depends DEBUG=1 NO_QT=1 NO_BDB=1 NO_ZMQ=1 NO_USDT=1 \
      AR=llvm-ar NM=llvm-nm RANLIB=llvm-ranlib STRIP=llvm-strip \
      CPPFLAGS="$CPPFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" -j$(nproc)
 
+EXTRA_BUILD_OPTIONS=
+if [[ "$FUZZING_ENGINE" = *"_msan"* ]]; then
+  # _FORTIFY_SOURCE is not compatible with MSAN.
+  EXTRA_BUILD_OPTIONS="-DAPPEND_CPPFLAGS='-U_FORTIFY_SOURCE'"
+fi
 
 cmake -B build_fuzz \
   --toolchain depends/$(./depends/config.guess)/toolchain.cmake \
@@ -23,7 +28,8 @@ cmake -B build_fuzz \
   -DCMAKE_C_FLAGS_RELWITHDEBINFO="" \
   -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="" \
   -DBUILD_FOR_FUZZING=ON \
-  -DSANITIZER_LDFLAGS="$LIB_FUZZING_ENGINE"
+  -DSANITIZER_LDFLAGS="$LIB_FUZZING_ENGINE" \
+  $EXTRA_BUILD_OPTIONS
 
 cmake --build build_fuzz -j$(nproc)
 

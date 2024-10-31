@@ -35,6 +35,11 @@ pub struct EnsembleOptions {
     )]
     pub libfuzzer_asan_binary: Option<PathBuf>,
     #[arg(
+        long = "libfuzzer-msan-binary",
+        help = "Specify a libFuzzer msan binary"
+    )]
+    pub libfuzzer_msan_binary: Option<PathBuf>,
+    #[arg(
         long = "libfuzzer-value-profile",
         help = "Ensemble a libFuzzer instance configured with -use_value_profile",
         default_value_t = false

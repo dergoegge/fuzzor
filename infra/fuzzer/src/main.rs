@@ -41,6 +41,7 @@ async fn main() -> Result<(), std::io::Error> {
                 Sanitizer::Coverage => None,
                 Sanitizer::Address => Some("asan"),
                 Sanitizer::Undefined => Some("ubsan"),
+                Sanitizer::Memory => Some("msan"),
                 Sanitizer::CmpLog => Some("cmplog"),
                 Sanitizer::ValueProfile => None,
                 Sanitizer::SemSan(_) => Some("secondary"),
@@ -101,7 +102,7 @@ async fn main() -> Result<(), std::io::Error> {
 
         if !config.has_engine(&FuzzEngine::AflPlusPlus) {
             // We only add libFuzzer sanitizer instances if we haven't already afl++ instances.
-            for sanitizer in &[Sanitizer::Address, Sanitizer::Undefined] {
+            for sanitizer in &[Sanitizer::Address, Sanitizer::Undefined, Sanitizer::Memory] {
                 if config.has_sanitizer(sanitizer) && num_cpus::get() > cores_assigned {
                     supported_fuzzers.push((FuzzEngine::LibFuzzer, sanitizer.clone()));
                     cores_assigned += 1;
@@ -139,7 +140,12 @@ async fn main() -> Result<(), std::io::Error> {
         supported_fuzzers.push((FuzzEngine::AflPlusPlus, Sanitizer::None));
         cores_assigned += 1;
 
-        for sanitizer in &[Sanitizer::CmpLog, Sanitizer::Address, Sanitizer::Undefined] {
+        for sanitizer in &[
+            Sanitizer::CmpLog,
+            Sanitizer::Address,
+            Sanitizer::Undefined,
+            Sanitizer::Memory,
+        ] {
             if config.has_sanitizer(sanitizer) && num_cpus::get() > cores_assigned {
                 supported_fuzzers.push((FuzzEngine::AflPlusPlus, sanitizer.clone()));
                 cores_assigned += 1;

@@ -26,6 +26,7 @@ pub enum FuzzEngine {
 pub enum Sanitizer {
     Undefined,
     Address,
+    Memory,
     Coverage,            // Only for FuzzEngine::None
     CmpLog,              // Only for FuzzEngine::AflPlusPlus
     ValueProfile,        // Only for FuzzEngine::LibFuzzer
@@ -164,6 +165,7 @@ pub fn get_harness_dir(
         (FuzzEngine::LibFuzzer, Sanitizer::None) => Some(String::from("libfuzzer")),
         (FuzzEngine::LibFuzzer, Sanitizer::Undefined) => Some(String::from("libfuzzer_ubsan")),
         (FuzzEngine::LibFuzzer, Sanitizer::Address) => Some(String::from("libfuzzer_asan")),
+        (FuzzEngine::LibFuzzer, Sanitizer::Memory) => Some(String::from("libfuzzer_msan")),
         (FuzzEngine::LibFuzzer, Sanitizer::Coverage) => None,
         (FuzzEngine::LibFuzzer, Sanitizer::CmpLog) => None,
         (FuzzEngine::LibFuzzer, Sanitizer::ValueProfile) => None,
@@ -172,6 +174,7 @@ pub fn get_harness_dir(
         (FuzzEngine::AflPlusPlus, Sanitizer::None) => Some(String::from("aflpp")),
         (FuzzEngine::AflPlusPlus, Sanitizer::Undefined) => Some(String::from("aflpp_ubsan")),
         (FuzzEngine::AflPlusPlus, Sanitizer::Address) => Some(String::from("aflpp_asan")),
+        (FuzzEngine::AflPlusPlus, Sanitizer::Memory) => Some(String::from("aflpp_msan")),
         (FuzzEngine::AflPlusPlus, Sanitizer::Coverage) => None,
         (FuzzEngine::AflPlusPlus, Sanitizer::CmpLog) => Some(String::from("aflpp_cmplog")),
         (FuzzEngine::AflPlusPlus, Sanitizer::ValueProfile) => None,
@@ -180,6 +183,7 @@ pub fn get_harness_dir(
         (FuzzEngine::HonggFuzz, Sanitizer::None) => Some(String::from("honggfuzz")),
         (FuzzEngine::HonggFuzz, Sanitizer::Undefined) => Some(String::from("honggfuzz_ubsan")),
         (FuzzEngine::HonggFuzz, Sanitizer::Address) => Some(String::from("honggfuzz_asan")),
+        (FuzzEngine::HonggFuzz, Sanitizer::Memory) => Some(String::from("honggfuzz_msan")),
         (FuzzEngine::HonggFuzz, Sanitizer::Coverage) => None,
         (FuzzEngine::HonggFuzz, Sanitizer::CmpLog) => None,
         (FuzzEngine::HonggFuzz, Sanitizer::ValueProfile) => None,
@@ -188,6 +192,7 @@ pub fn get_harness_dir(
         (FuzzEngine::SemSan, Sanitizer::None) => Some(String::from("semsan")),
         (FuzzEngine::SemSan, Sanitizer::Undefined) => None,
         (FuzzEngine::SemSan, Sanitizer::Address) => None,
+        (FuzzEngine::SemSan, Sanitizer::Memory) => None,
         (FuzzEngine::SemSan, Sanitizer::Coverage) => None,
         (FuzzEngine::SemSan, Sanitizer::CmpLog) => None,
         (FuzzEngine::SemSan, Sanitizer::ValueProfile) => None,
@@ -196,6 +201,7 @@ pub fn get_harness_dir(
         (FuzzEngine::NativeGo, Sanitizer::None) => Some(String::from("native_go")),
         (FuzzEngine::NativeGo, Sanitizer::Undefined) => None,
         (FuzzEngine::NativeGo, Sanitizer::Address) => None,
+        (FuzzEngine::NativeGo, Sanitizer::Memory) => None,
         (FuzzEngine::NativeGo, Sanitizer::Coverage) => None,
         (FuzzEngine::NativeGo, Sanitizer::CmpLog) => None,
         (FuzzEngine::NativeGo, Sanitizer::ValueProfile) => None,
@@ -204,6 +210,7 @@ pub fn get_harness_dir(
         (FuzzEngine::None, Sanitizer::None) => None,
         (FuzzEngine::None, Sanitizer::Undefined) => None,
         (FuzzEngine::None, Sanitizer::Address) => None,
+        (FuzzEngine::None, Sanitizer::Memory) => None,
         (FuzzEngine::None, Sanitizer::Coverage) => Some(String::from("coverage")),
         (FuzzEngine::None, Sanitizer::CmpLog) => None,
         (FuzzEngine::None, Sanitizer::ValueProfile) => None,

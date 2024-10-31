@@ -328,7 +328,12 @@ async fn main() -> Result<(), std::io::Error> {
     let mut repro_futures = futures::stream::FuturesUnordered::new();
     let mut repro_futures_differential = futures::stream::FuturesUnordered::new();
 
-    let sanitizers = vec![Sanitizer::None, Sanitizer::Undefined, Sanitizer::Address];
+    let sanitizers = vec![
+        Sanitizer::None,
+        Sanitizer::Undefined,
+        Sanitizer::Address,
+        Sanitizer::Memory,
+    ];
     let libfuzzer_bins: Vec<PathBuf> = sanitizers
         .iter()
         .filter(|sanitizer| config.has_sanitizer(sanitizer))
