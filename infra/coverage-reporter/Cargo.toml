@@ -3,6 +3,9 @@ name = "coverage-reporter"
 version = "0.1.0"
 edition = "2021"
 
+[profile.release]
+strip = "symbols"
+
 [dependencies]
 serde = { version = "1.0.197", features = ["derive"] }
 serde_yaml = "0.9.32"

@@ -3,6 +3,9 @@ name = "ensemble-fuzz"
 version = "0.1.0"
 edition = "2021"
 
+[profile.release]
+strip = "symbols"
+
 [dependencies]
 async-trait = "0.1.80"
 clap = { version = "4.5.4", features = ["derive", "string"] }
