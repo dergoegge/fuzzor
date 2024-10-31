@@ -53,10 +53,12 @@ async fn ensemble_fuzzers(
 /// Start the ensemble task.
 ///
 /// This task regularly (every [`sync_interval`] seconds) syncs each fuzzer's corpus with the
-/// global corpus. It also logs aggregated stats and writes them to disk as "stats.yaml".
+/// global corpus. It also logs aggregated stats and writes them to disk as "stats.yaml" (every
+/// [`stats_interval`] seconds).
 pub async fn start_ensemble_task(
     mut fuzzers: Vec<SharedFuzzer>,
     sync_interval: u64,
+    stats_interval: u64,
     workspace: PathBuf,
 ) -> (JoinHandle<()>, Sender<()>) {
     let global_corpus = workspace.join("corpus");
@@ -67,7 +69,7 @@ pub async fn start_ensemble_task(
     let task_handle = tokio::spawn(async move {
         // Sync the global fuzzer corpus every `sync_interval` seconds.
         use tokio::time::{interval, Duration};
-        let mut stats_interval = interval(Duration::from_secs(60));
+        let mut stats_interval = interval(Duration::from_secs(stats_interval));
         let mut interval = interval(Duration::from_secs(sync_interval));
 
         let mut quit = false;

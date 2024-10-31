@@ -279,8 +279,13 @@ async fn main() {
         child_procs.push(fuzzer.start());
     }
 
-    let (ensemble_task, ensemble_quit) =
-        start_ensemble_task(fuzzers.clone(), options.sync_interval, options.workspace).await;
+    let (ensemble_task, ensemble_quit) = start_ensemble_task(
+        fuzzers.clone(),
+        options.sync_interval,
+        60, // seconds
+        options.workspace,
+    )
+    .await;
 
     if let Some(max_duration) = options.max_duration {
         // Wait for ctrl-c or the specified max fuzzing duration to be reached.
