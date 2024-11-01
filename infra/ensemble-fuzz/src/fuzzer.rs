@@ -248,7 +248,7 @@ fn spawn_honggfuzz_stats_parser(
 
             let current_stats: Vec<u64> = line
                 .split(",")
-                .map(|num_str| num_str.parse::<u64>().unwrap())
+                .map(|num_str| num_str.trim().parse::<u64>().unwrap())
                 .collect();
 
             let mut stats = last_stats.lock().await;
