@@ -119,6 +119,8 @@ impl Fuzzer for HonggFuzzer {
 
         let num_threads_str = self.num_threads.to_string();
         let args = vec![
+            "--timeout",
+            "10",
             "--verbose",
             "--quiet",
             "--statsfile",
@@ -254,7 +256,7 @@ fn spawn_honggfuzz_stats_parser(
             let mut stats = last_stats.lock().await;
             stats.execs_per_sec = current_stats[3] as f64;
             stats.saved_crashes = current_stats[5];
-            stats.saved_hangs = current_stats[6];
+            // stats.saved_hangs = current_stats[6]; // hongfuzz does not save timeouts to disk :(
             // TODO corpus count
         }
     });
