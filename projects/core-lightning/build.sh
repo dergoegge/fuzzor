@@ -6,7 +6,20 @@ pushd lightning
 
 echo "unsigned-integer-overflow:ccan/" >> ../ubsan_suppressions
 
-./configure --enable-fuzzing --disable-valgrind CC=clang CONFIGURATOR_CC=clang CWARNFLAGS="-Wno-error=gnu-folding-constant $CFLAGS"
+EXTRA_CONF_OPTS=
+if [[ "$FUZZING_ENGINE" = *"_asan"* ]]; then
+  EXTRA_CONF_OPTS="--enable-address-sanitizer"
+fi
+
+if [[ "$FUZZING_ENGINE" = *"_ubsan"* ]]; then
+  EXTRA_CONF_OPTS="--enable-ub-sanitizer"
+fi
+
+if [[ "$FUZZING_ENGINE" = *"coverage"* ]]; then
+  EXTRA_CONF_OPTS="--enable-coverage"
+fi
+
+./configure $EXTRA_CONF_OPTS --enable-fuzzing --disable-valgrind CC=clang CONFIGURATOR_CC=clang CWARNFLAGS="-Wno-error=gnu-folding-constant"
 
 make -j$(nproc)
 
