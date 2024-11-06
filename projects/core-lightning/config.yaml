@@ -9,10 +9,13 @@ ccs:
 
 engines:
 - LibFuzzer
+- AflPlusPlus
+- HonggFuzz
 - None
 sanitizers:
 - ValueProfile
 - Undefined
 - Address
+- CmpLog
 - Coverage
 - None
