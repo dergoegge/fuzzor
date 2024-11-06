@@ -19,7 +19,7 @@ if [[ "$FUZZING_ENGINE" = *"coverage"* ]]; then
   EXTRA_CONF_OPTS="--enable-coverage"
 fi
 
-./configure $EXTRA_CONF_OPTS --enable-fuzzing --disable-valgrind CC=clang CONFIGURATOR_CC=clang CWARNFLAGS="-Wno-error=gnu-folding-constant"
+./configure $EXTRA_CONF_OPTS --enable-fuzzing --disable-valgrind CC=$CC CONFIGURATOR_CC=$CC CWARNFLAGS="-Wno-error=gnu-folding-constant"
 
 make -j$(nproc)
 
