@@ -232,7 +232,7 @@ where
         }
     }
 
-    pub async fn run(&mut self, mut quit_rx: Receiver<()>) {
+    pub async fn run(&mut self, mut quit_rx: Receiver<bool>) {
         self.send_event(CampaignEvent::Initialized(self.harness_name.clone()))
             .await;
 
@@ -247,14 +247,22 @@ where
         ));
 
         let mut quit = false;
+        let mut kill = false; // end the campaign without sending a quit event
         while !quit {
             tokio::select! {
                 _ = inspect_interval.tick() => match self.env.get_stats().await {
                     Ok(stats) => self.process_stats(stats).await,
                     Err(err) => log::trace!("{}", err),
                 },
-                _ = quit_rx.recv() => quit = true,
+                maybe_kill = quit_rx.recv() => {
+                    quit = true;
+                    kill = maybe_kill.unwrap_or(false);
+                }
             };
+
+            if kill {
+                break;
+            }
 
             if let Ok(false) = self.env.ping().await {
                 // End the campaign once fuzzing has stopped. It likely stopped because we've
@@ -269,7 +277,7 @@ where
         }
 
         let campaign_ended = self.state == CampaignState::Ended;
-        let corpus = if campaign_ended {
+        let corpus = if campaign_ended && !kill {
             let corpus = match self.env.get_corpus(true).await {
                 Ok(c) => Some(c),
                 Err(err) => {
@@ -310,13 +318,15 @@ where
             None
         };
 
-        self.send_event(CampaignEvent::Quit(
-            self.harness_name.clone(),
-            // Only free the environment if the campaign actually ended.
-            campaign_ended,
-            corpus,
-        ))
-        .await;
+        if !kill {
+            self.send_event(CampaignEvent::Quit(
+                self.harness_name.clone(),
+                // Only free the environment if the campaign actually ended.
+                campaign_ended,
+                corpus,
+            ))
+            .await;
+        }
 
         log::info!(
             "Campaign ended: project='{}' harness='{}' env='{}'",

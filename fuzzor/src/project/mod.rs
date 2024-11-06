@@ -58,7 +58,7 @@ where
     env_allocator: EA,
     wake_up_scheduler: Option<Sender<()>>,
 
-    campaigns: HashMap<String, (CampaignJoinHandle<E>, Sender<()>)>,
+    campaigns: HashMap<String, (CampaignJoinHandle<E>, Sender<bool>)>,
 
     monitors: Vec<Box<dyn ProjectMonitor + Send>>,
 
@@ -205,11 +205,52 @@ where
                 campaign.0,
             );
 
-            let _ = campaign.2.send(()).await;
-            let _ = campaign.1.await;
+            let _ = campaign.2.send(true).await;
+            self.finish_campaign(campaign.0, campaign.1, None).await;
         } else {
             self.campaigns.insert(campaign.0, (campaign.1, campaign.2));
         }
+    }
+
+    async fn finish_campaign(
+        &mut self,
+        harness: String,
+        campaign_handle: CampaignJoinHandle<E>,
+        corpus: Option<Vec<u8>>,
+    ) {
+        if let Ok(Campaign { env, .. }) = campaign_handle.await {
+            self.env_allocator.free(env).await;
+        } else {
+            log::error!(
+                "Failed to wait for campaign to join (project='{}', harness='{}')",
+                self.config.name,
+                harness
+            );
+        }
+
+        if let Some(corpus) = corpus {
+            let corpus_herder = self.state.corpus_herder().await;
+
+            // Hand the corpus of to the corpus herder.
+            if let Err(err) = corpus_herder
+                .lock()
+                .await
+                .merge(harness.clone(), corpus)
+                .await
+            {
+                log::warn!(
+                    "Could not merge new corpus for project '{}': {}",
+                    self.config.name,
+                    err
+                );
+            };
+        }
+
+        // Mark the campaign as finished with the scheduler.
+        let _ = self.scheduler.lock().await.finish(&harness);
+        // Wake up the scheduler task to see if there is a new campaign to schedule.
+        // Note: We use try_send to avoid blocking on a full channel.
+        let _ = self.wake_up_scheduler.as_ref().unwrap().try_send(());
     }
 
     async fn handle_campaign_event(&mut self, event: CampaignEvent) {
@@ -230,8 +271,7 @@ where
             }
             CampaignEvent::Quit(harness, _ended, corpus) => {
                 if let Some((handle, _)) = self.campaigns.remove(&harness) {
-                    let campaign = handle.await.unwrap();
-                    self.env_allocator.free(campaign.env).await;
+                    self.finish_campaign(harness, handle, corpus).await;
                 } else {
                     log::error!(
                         "Received quit event but the campaign was not found (harness={}, project={})",
@@ -239,30 +279,6 @@ where
                         self.config.name
                     );
                 }
-
-                if let Some(corpus) = corpus {
-                    let corpus_herder = self.state.corpus_herder().await;
-
-                    // Hand the corpus of to the corpus herder.
-                    if let Err(err) = corpus_herder
-                        .lock()
-                        .await
-                        .merge(harness.clone(), corpus)
-                        .await
-                    {
-                        log::warn!(
-                            "Could not merge new corpus for project '{}': {}",
-                            self.config.name,
-                            err
-                        );
-                    };
-                }
-
-                // Mark the campaign as finished with the scheduler.
-                let _ = self.scheduler.lock().await.finish(&harness);
-                // Wake up the scheduler task to see if there is a new campaign to schedule.
-                // Note: We use try_send to avoid blocking on a full channel.
-                let _ = self.wake_up_scheduler.as_ref().unwrap().try_send(());
             }
             _ => {}
         }
@@ -350,7 +366,7 @@ where
 
         // Quit all active campaigns.
         for (_, (campaign_handle, quit)) in self.campaigns.drain() {
-            let _ = quit.send(()).await;
+            let _ = quit.send(false).await;
             let _ = campaign_handle.await;
         }
     }
@@ -425,7 +441,7 @@ where
     }
 }
 
-type ScheduledCampaign<E> = (String, CampaignJoinHandle<E>, Sender<()>);
+type ScheduledCampaign<E> = (String, CampaignJoinHandle<E>, Sender<bool>);
 
 struct CampaignScheduleTask<E, EA, CH>
 where
