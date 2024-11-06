@@ -133,10 +133,7 @@ impl CoverageBasedScheduler {
 
     /// Create a CoverageBasedScheduler that will fall back to round robin scheduling once finished
     /// with fuzzing the harnesses that reached the modified files.
-    pub fn with_round_robin_fallback(
-        project_config: ProjectConfig,
-        duration: u64,
-    ) -> Self {
+    pub fn with_round_robin_fallback(project_config: ProjectConfig, duration: u64) -> Self {
         Self {
             base_harnesses: None,
             schedule: VecDeque::new(),
@@ -227,12 +224,7 @@ impl CampaignScheduler for CoverageBasedScheduler {
             let harnesses = input.harnesses.lock().await;
 
             // Schedule harnesses that reach the modified files
-            log::info!(
-                "Attempting to schedule harnesses to reach {} modified files (project='{}', files='{:?}')",
-                input.modified_files.len(),
-                self.project_config.name,
-                input.modified_files,
-            );
+            let mut newly_scheduled = Vec::new();
             for file in input.modified_files.iter() {
                 for (harness_name, harness) in harnesses.iter() {
                     let harness = harness.lock().await;
@@ -244,11 +236,21 @@ impl CampaignScheduler for CoverageBasedScheduler {
                     }
 
                     if !current_schedule.contains(harness_name) {
+                        newly_scheduled.push(harness_name.as_str());
                         self.schedule.push_front(harness_name.clone());
                         current_schedule.insert(harness_name.clone());
                     }
                 }
             }
+
+            log::info!(
+                "Scheduled {} harnesses to reach {} modified files (project='{}', files='{:?}', scheduled='{:?}')",
+                newly_scheduled.len(),
+                input.modified_files.len(),
+                self.project_config.name,
+                input.modified_files,
+                newly_scheduled,
+            );
         }
     }
 
