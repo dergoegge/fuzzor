@@ -19,6 +19,9 @@ if [[ "$FUZZING_ENGINE" = *"coverage"* ]]; then
   EXTRA_CONF_OPTS="--enable-coverage"
 fi
 
+echo "leak:ccan/" >> lsan_suppr.txt
+export LSAN_OPTIONS=suppressions=lsan_suppr.txt
+
 ./configure $EXTRA_CONF_OPTS --enable-fuzzing --disable-valgrind CC=$CC CONFIGURATOR_CC=$CC CWARNFLAGS="-Wno-error=gnu-folding-constant"
 
 # Hack to only build the fuzz harness bins
