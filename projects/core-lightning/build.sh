@@ -21,7 +21,10 @@ fi
 
 ./configure $EXTRA_CONF_OPTS --enable-fuzzing --disable-valgrind CC=$CC CONFIGURATOR_CC=$CC CWARNFLAGS="-Wno-error=gnu-folding-constant"
 
-make -j$(nproc)
+# Hack to only build the fuzz harness bins
+echo "#!/bin/bash" > tests/fuzz/check-fuzz.sh
+chmod +x tests/fuzz/check-fuzz.sh
+make -j$(nproc) check-fuzz
 
 rm -rf ./tests/fuzz/fuzz-*.c
 rm -rf ./tests/fuzz/fuzz-*.o
