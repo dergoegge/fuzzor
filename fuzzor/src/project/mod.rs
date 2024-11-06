@@ -194,7 +194,22 @@ where
     }
 
     async fn handle_new_campaign(&mut self, campaign: ScheduledCampaign<E>) {
-        self.campaigns.insert(campaign.0, (campaign.1, campaign.2));
+        if self.campaigns.contains_key(&campaign.0) {
+            // This can happen if e.g. the coverage based scheduler with a round-robin fallback
+            // schedules the same harness twice, once based on coverage and once based on the r-r.
+            //
+            // TODO spinning up the duplicate campaign and then immediately killing it wastes
+            // resources, fix this in the scheduler instead.
+            log::warn!(
+                "Campaign ('{}') was scheduled twice, stopping the duplicate now!",
+                campaign.0,
+            );
+
+            let _ = campaign.2.send(()).await;
+            let _ = campaign.1.await;
+        } else {
+            self.campaigns.insert(campaign.0, (campaign.1, campaign.2));
+        }
     }
 
     async fn handle_campaign_event(&mut self, event: CampaignEvent) {
