@@ -120,7 +120,13 @@ impl HarnessState for PersistentHarnessState {
         self.covered_files.clone()
     }
     async fn covers_file(&self, file: String) -> bool {
-        self.covered_files.contains(&file)
+        for covered_file in self.covered_files.iter() {
+            if covered_file.ends_with(&file) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     async fn store_coverage_report(&self, tar: Vec<u8>) {

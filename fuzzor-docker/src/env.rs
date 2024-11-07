@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::io::Read;
-use std::path::PathBuf;
 use std::str::FromStr;
 
 use fuzzor::{
@@ -322,14 +321,8 @@ impl Environment for DockerEnv {
             let mut file_names = Vec::new();
             for file_obj in values["data"][0]["files"].as_array().unwrap().iter() {
                 if file_obj["summary"]["lines"]["covered"].as_i64().unwrap() > 0 {
-                    let path = PathBuf::from(file_obj["filename"].as_str().unwrap());
-                    // Pop off the first three components
-                    let mut components = path.components();
-                    components.next(); // root folder
-                    components.next(); // workdir folder
-                    components.next(); // project folder
-
-                    file_names.push(components.as_path().to_str().unwrap().to_string());
+                    // Collect files that have line coverage
+                    file_names.push(file_obj["filename"].to_string());
                 }
             }
 
