@@ -2,30 +2,19 @@ FROM fuzzor-base
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   dirmngr \
-  gettext \
   gnupg \
-  libpq-dev \
+  jq \
   libtool \
   libffi-dev \
   libssl-dev \
   libsqlite3-dev \
-  protobuf-compiler \
-  python3.8 \
-  python3-dev \
   python3-mako \
-  python3-pip \
-  python3-venv \
   python3-setuptools \
-  python3-grpcio \
-  libev-dev \
-  libevent-dev \
-  qemu-user-static \
-  jq
-
-RUN pip3 install --break-system-packages --user grpcio-tools
+  qemu-user-static
 
 COPY ./config.yaml .
 COPY ./build.sh .
+COPY ./all-fuzz-programs.patch .
 
 ARG OWNER=ElementsProject
 ARG REPO=lightning
