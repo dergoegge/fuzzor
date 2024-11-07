@@ -3,6 +3,7 @@ ARG GCC_V=14
 FROM debian:sid-slim AS llvm_builder
 
 ARG GCC_V
+ENV GCC_V=$GCC_V
 ENV CCACHE_DIR=/ccache
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
@@ -54,6 +55,7 @@ RUN --mount=type=cache,target=/ccache/ \
 FROM debian:sid-slim
 
 ARG GCC_V
+ENV GCC_V=$GCC_V
 
 COPY --from=LLVM_BUILDER /llvm_build* /usr/
 COPY --from=LLVM_BUILDER /libcxx_msan /libcxx_msan
