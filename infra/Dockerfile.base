@@ -1,84 +1,104 @@
-FROM debian:sid-slim
-
 ARG GCC_V=14
-ENV GCC_V=$GCC_V
+
+FROM debian:sid-slim AS llvm_builder
+
+ARG GCC_V
+ENV CCACHE_DIR=/ccache
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-  ninja-build \
-  libgtk-3-dev \
-  pax-utils \
-  python3-msgpack \
-  python3-jinja2 \
-  curl \
-  cpio \
-  git \
-  build-essential \
+  binutils \
   binutils-dev \
-  libtool \
+  ccache \
+  cmake \
+  gcc-${GCC_V} \
+  gcc-${GCC_V}-plugin-dev \
+  g++-${GCC_V} \
+  git \
+  ninja-build \
+  python3
+
+RUN git clone --depth 1 --branch "llvmorg-19.1.3" https://github.com/llvm/llvm-project.git
+
+# Build clang and runtimes
+RUN --mount=type=cache,target=/ccache/ \
+    cmake -S /llvm-project/llvm \
+          -G Ninja \
+          -B /llvm-project/build/ \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER=gcc-${GCC_V} \
+          -DCMAKE_CXX_COMPILER=g++-${GCC_V} \
+          -DCMAKE_INSTALL_PREFIX=/llvm_build \
+          -DLLVM_BINUTILS_INCDIR=/usr/include \
+          -DLLVM_CCACHE_BUILD=ON \
+          -DLLVM_ENABLE_PROJECTS="clang" \
+          -DLLVM_ENABLE_RUNTIMES="compiler-rt;libcxx;libcxxabi;libunwind" \
+          -DLLVM_TARGETS_TO_BUILD=Native && \
+    ninja -C /llvm-project/build/ "-j$(nproc)" install/strip
+
+# Build a memory sanitizer instrumented libc++
+RUN --mount=type=cache,target=/ccache/ \
+    cmake -S /llvm-project/runtimes \
+          -G Ninja \
+          -B /libcxx_msan \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER=/llvm_build/bin/clang \
+          -DCMAKE_CXX_COMPILER=/llvm_build/bin/clang++ \
+          -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
+          -DLIBCXX_HARDENING_MODE=debug \
+          -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF \
+          -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi;libunwind' \
+          -DLLVM_TARGETS_TO_BUILD=Native \
+          -DLLVM_USE_SANITIZER=MemoryWithOrigins && \
+    ninja -C /libcxx_msan "-j$(nproc)"
+
+FROM debian:sid-slim
+
+ARG GCC_V
+
+COPY --from=LLVM_BUILDER /llvm_build* /usr/
+COPY --from=LLVM_BUILDER /libcxx_msan /libcxx_msan
+
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   autotools-dev \
   automake \
-  pkg-config \
-  gnuplot \
-  bsdmainutils \
-  openssh-client \
-  python3 \
-  python3-venv \
+  binutils-dev \
+  build-essential \
   ccache \
-  rsync \
   cmake \
-  libz3-dev \
-  linux-perf \
+  curl \
+  cpio \
   gcc-${GCC_V}-arm-linux-gnueabihf \
   g++-${GCC_V}-arm-linux-gnueabihf \
   gcc-${GCC_V}-x86-64-linux-gnu \
   g++-${GCC_V}-x86-64-linux-gnu \
-  gcc-${GCC_V}-plugin-dev
+  gcc-${GCC_V}-plugin-dev \
+  git \
+  gnuplot \
+  libgtk-3-dev \
+  libtool \
+  libunwind-dev \
+  libz3-dev \
+  linux-perf \
+  ninja-build \
+  openssh-client \
+  pkg-config \
+  pax-utils \
+  python3 \
+  python3-msgpack \
+  python3-jinja2 \
+  python3-venv \
+  rsync
 
 RUN git clone https://github.com/rui314/mold.git --depth 1 --branch v2.34.1
 RUN cmake -G Ninja -B /mold/build -S mold -DCMAKE_BUILD_TYPE=Release && \
     ninja -C /mold/build/ "-j$(nproc)" install/strip \
     && rm -rf /mold
 
-RUN git clone https://github.com/google/honggfuzz.git
-RUN apt install libunwind-dev -y
-RUN cd honggfuzz && make -j$(nproc) install
-
 # Force mold usage
 RUN rm -rf $(which ld) && ln -s $(which mold) /usr/bin/ld
 
-RUN git clone --depth 1 --branch "llvmorg-19.1.3" https://github.com/llvm/llvm-project.git
-
-ENV CCACHE_DIR=/ccache
-# Build clang and runtimes
-RUN --mount=type=cache,target=/ccache/ \
-    cmake -G Ninja -B /llvm-project/build/ \
-    -DLLVM_CCACHE_BUILD=ON \
-    -DLLVM_ENABLE_PROJECTS="clang" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DLLVM_BINUTILS_INCDIR=/usr/include \
-    -DLLVM_TARGETS_TO_BUILD=Native \
-    -DLLVM_ENABLE_RUNTIMES="compiler-rt;libcxx;libcxxabi;libunwind" \
-    -S /llvm-project/llvm \
-  && ninja -C /llvm-project/build/ "-j$(nproc)" install/strip
-
-# Build a memory sanitizer instrumented libc++
-RUN --mount=type=cache,target=/ccache/ \
-  mkdir libcxx_msan && \
-  cmake -G Ninja -B /libcxx_msan \
-    -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi;libunwind' \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DLLVM_USE_SANITIZER=MemoryWithOrigins \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
-    -DLLVM_TARGETS_TO_BUILD=Native \
-    -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF \
-    -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
-    -DLIBCXX_HARDENING_MODE=debug \
-    -S /llvm-project/runtimes \
-  && ninja -C /libcxx_msan "-j$(nproc)" \
-  && rm -rf /llvm-project
-
-ENV MSAN_LIBCXX_PATH=/libcxx_msan
+RUN git clone https://github.com/google/honggfuzz.git
+RUN cd honggfuzz && make -j$(nproc) install
 
 # Clone AFLplusplus and build
 RUN git clone --branch stable https://github.com/AFLplusplus/AFLplusplus
@@ -163,6 +183,8 @@ ENV AFL_NO_CRASH_README=1
 ENV AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1
 ENV AFL_SKIP_CPUFREQ=1
 ENV AFL_HANG_TMOUT=60000
+
+ENV MSAN_LIBCXX_PATH=/libcxx_msan
 
 RUN touch ubsan_suppressions
 ENV ASAN_OPTIONS="detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:abort_on_error=1:exitcode=75"
