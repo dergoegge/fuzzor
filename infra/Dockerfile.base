@@ -140,7 +140,7 @@ COPY --from=rust_builder /root/.cargo/bin/builder \
                          /root/.cargo/bin/semsam* \
                          /usr/local/bin/
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
   autotools-dev \
   automake \
   binutils-dev \
@@ -155,7 +155,6 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   g++-${GCC_V}-x86-64-linux-gnu \
   gcc-${GCC_V}-plugin-dev \
   git \
-  gnuplot \
   libtool \
   libunwind-dev \
   libz3-dev \
