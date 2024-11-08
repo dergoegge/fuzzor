@@ -1,16 +1,12 @@
 FROM fuzzor-base
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-  dirmngr \
-  gnupg \
   jq \
-  libtool \
   libffi-dev \
   libssl-dev \
   libsqlite3-dev \
   python3-mako \
-  python3-setuptools \
-  qemu-user-static
+  python3-setuptools
 
 COPY ./config.yaml .
 COPY ./build.sh .
