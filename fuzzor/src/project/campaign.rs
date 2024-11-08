@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use super::harness::*;
@@ -30,6 +30,8 @@ pub enum CampaignEvent {
     NewState(String, CampaignState, CampaignState),
     /// NewSolution fires when a campaign discovers a *new* solution for the given harness
     NewSolution(String, Solution),
+    /// ResolvedSolution fires when a solution no longer reproduces
+    ResolvedSolution(String, Solution),
     /// Stats fires when new fuzzing stats are available
     Stats(String, FuzzerStats),
     /// Quit fires when a campaign task quits
@@ -238,6 +240,64 @@ where
 
         let _ = self.env.start().await;
 
+        let mut quit = false;
+        let mut kill = false; // kill: end the campaign without sending a quit event
+
+        let existing_solutions = {
+            let harness = self.harness.lock().await;
+            let state = harness.state();
+            state.solutions().await.lock().await.get_all()
+        };
+        let solution_set: HashSet<String> =
+            HashSet::from_iter(existing_solutions.iter().map(|s| s.id().to_string()));
+
+        match self.env.reproduce_solutions(existing_solutions).await {
+            Ok(solutions) => {
+                let reproduced_solution_set: HashSet<String> =
+                    HashSet::from_iter(solutions.iter().map(|s| s.id().to_string()));
+
+                for solution_id in solution_set.iter() {
+                    if reproduced_solution_set.contains(solution_id.as_str()) {
+                        log::info!(
+                            "Existing solution ({}) still reproduces (project='{}', harness='{}')",
+                            solution_id,
+                            self.project_name,
+                            self.harness_name,
+                        );
+
+                        quit = true; // Quit campaigns that have unresolved solutions
+                    } else {
+                        log::info!(
+                            "Existing solution ({}) no longer reproduces (project='{}', harness='{}')",
+                            solution_id,
+                            self.project_name,
+                            self.harness_name,
+                        );
+
+                        let solution = {
+                            let harness = self.harness.lock().await;
+                            let state = harness.state();
+                            let tracker = state.solutions().await;
+
+                            let solution = tracker
+                                .lock()
+                                .await
+                                .mark_as_resolved(solution_id)
+                                .expect("Solution has to exist in the tracker at this point");
+                            solution
+                        };
+
+                        self.send_event(CampaignEvent::ResolvedSolution(
+                            self.harness_name.clone(),
+                            solution,
+                        ))
+                        .await;
+                    }
+                }
+            }
+            Err(err) => log::warn!("Could not reproduce initial solutions: {}", err),
+        };
+
         let default_inspect_timeout = 60;
         let mut inspect_interval = tokio::time::interval(tokio::time::Duration::from_secs(
             std::env::var("FUZZOR_CAMPAIGN_INTERVAL").map_or(default_inspect_timeout, |val| {
@@ -246,8 +306,6 @@ where
             }),
         ));
 
-        let mut quit = false;
-        let mut kill = false; // end the campaign without sending a quit event
         while !quit {
             tokio::select! {
                 _ = inspect_interval.tick() => match self.env.get_stats().await {

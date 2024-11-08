@@ -18,6 +18,8 @@ pub trait Environment {
     async fn get_stats(&self) -> Result<FuzzerStats, String>;
     /// Get all fuzz solutions (crashes, timeouts, etc.) found so far
     async fn get_solutions(&self) -> Result<Vec<Solution>, String>;
+    /// Attempt to reproduce the given solutions
+    async fn reproduce_solutions(&self, solutions: Vec<Solution>) -> Result<Vec<Solution>, String>;
     /// Get a tarball of the corpus
     async fn get_corpus(&self, minimize: bool) -> Result<Vec<u8>, String>;
     /// Get the names of the source files that were covered through fuzzing

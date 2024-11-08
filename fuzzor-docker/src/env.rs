@@ -163,7 +163,7 @@ impl DockerEnv {
         Ok(tar_bytes)
     }
 
-    async fn reproduce_solutions(&self) -> Result<(), String> {
+    async fn reproduce_solutions(&self, input_solutions: String) -> Result<(), String> {
         let env = self
             .params
             .project_config
@@ -186,7 +186,7 @@ impl DockerEnv {
                         "--output-dir".to_string(),
                         "/workdir/reproduced_solutions".to_string(),
                         "/workdir/config.yaml".to_string(),
-                        "workspace/solutions".to_string(),
+                        input_solutions,
                         self.params.harness_name.clone(),
                     ]),
                     ..Default::default()
@@ -212,6 +212,80 @@ impl DockerEnv {
         }
 
         Ok(())
+    }
+
+    async fn upload_initial_solutions(&self, solutions: Vec<Solution>) -> Result<(), String> {
+        if solutions.is_empty() {
+            return Ok(());
+        }
+
+        let options = Some(bollard::container::UploadToContainerOptions {
+            path: "/workdir/workspace/initial_solutions",
+            ..Default::default()
+        });
+
+        let mut tar = tar::Builder::new(Vec::new());
+        for solution in solutions.iter() {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(solution.input_bytes().len() as u64);
+            header.set_cksum();
+
+            tar.append_data(
+                &mut header,
+                &format!("./{}", solution.id()),
+                solution.input_bytes(),
+            )
+            .unwrap();
+        }
+
+        self.docker
+            .upload_to_container(
+                &self.container_id,
+                options,
+                tar.into_inner()
+                    .map_err(|e| format!("Could not create archive: {}", e))?
+                    .into(),
+            )
+            .await
+            .map_err(|e| format!("Could not upload initial corpus: {:?}", e))?;
+
+        Ok(())
+    }
+
+    async fn download_reproduced_solutions(&self) -> Result<Vec<Solution>, String> {
+        let solution_tar_bytes = self
+            .download_tar(String::from("/workdir/reproduced_solutions"))
+            .await?;
+
+        let mut solutions = Vec::new();
+        let mut archive = tar::Archive::new(solution_tar_bytes.as_slice());
+        for entry in archive.entries().unwrap() {
+            let entry = entry.unwrap();
+            if entry.header().entry_type().is_dir() {
+                continue;
+            }
+
+            if let Ok(solution) = serde_yaml::from_reader(entry) {
+                let solution: ReproducedSolution = solution;
+                let trace = String::from_utf8(solution.trace).unwrap();
+
+                match solution.code {
+                    78 => solutions.push(Solution::from_timeout(solution.input, trace)),
+                    71 => {
+                        solutions.push(Solution::from_differential_solution(solution.input, trace))
+                    }
+                    _ => solutions.push(Solution::from_crash(solution.input, trace)),
+                }
+            }
+        }
+
+        log::trace!(
+            "Downloaded {} solutions from docker env ({})",
+            solutions.len(),
+            &self.container_id[0..16]
+        );
+
+        Ok(solutions)
     }
 }
 
@@ -249,41 +323,19 @@ impl Environment for DockerEnv {
     }
 
     async fn get_solutions(&self) -> Result<Vec<Solution>, String> {
-        self.reproduce_solutions().await?;
-
-        let solution_tar_bytes = self
-            .download_tar(String::from("/workdir/reproduced_solutions"))
+        self.reproduce_solutions("/workdir/workspace/solutions".to_string())
             .await?;
 
-        let mut solutions = Vec::new();
-        let mut archive = tar::Archive::new(solution_tar_bytes.as_slice());
-        for entry in archive.entries().unwrap() {
-            let entry = entry.unwrap();
-            if entry.header().entry_type().is_dir() {
-                continue;
-            }
+        self.download_reproduced_solutions().await
+    }
 
-            if let Ok(solution) = serde_yaml::from_reader(entry) {
-                let solution: ReproducedSolution = solution;
-                let trace = String::from_utf8(solution.trace).unwrap();
+    async fn reproduce_solutions(&self, solutions: Vec<Solution>) -> Result<Vec<Solution>, String> {
+        self.upload_initial_solutions(solutions).await?;
 
-                match solution.code {
-                    78 => solutions.push(Solution::from_timeout(solution.input, trace)),
-                    71 => {
-                        solutions.push(Solution::from_differential_solution(solution.input, trace))
-                    }
-                    _ => solutions.push(Solution::from_crash(solution.input, trace)),
-                }
-            }
-        }
+        self.reproduce_solutions("/workdir/workspace/initial_solutions".to_string())
+            .await?;
 
-        log::trace!(
-            "Downloaded {} solutions from docker env ({})",
-            solutions.len(),
-            &self.container_id[0..16]
-        );
-
-        Ok(solutions)
+        self.download_reproduced_solutions().await
     }
 
     async fn get_corpus(&self, minimize: bool) -> Result<Vec<u8>, String> {

@@ -22,4 +22,8 @@ impl SolutionTracker for InMemorySolutionTracker {
     fn get_open(&self, id: &str) -> Option<&Solution> {
         self.solutions.get(id)
     }
+
+    fn get_all(&self) -> Vec<Solution> {
+        self.solutions.values().map(|s| s.clone()).collect()
+    }
 }

@@ -108,6 +108,8 @@ pub trait SolutionTracker {
     fn submit(&mut self, solution: Solution) -> bool;
     /// Retrieve an open solution from the tracker by its deduplication id.
     fn get_open(&self, id: &str) -> Option<&Solution>;
+    /// Get all solutions in the tracker
+    fn get_all(&self) -> Vec<Solution>;
 }
 
 // Split a string by `delim` while also ensuring that each split has an equal number of '(' and
