@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::solutions::{inmemory::InMemorySolutionStore, SolutionStore};
+use crate::solutions::{inmemory::InMemorySolutionTracker, SolutionTracker};
 
 use fuzzor_infra::FuzzerStats;
 use tokio::{
@@ -14,7 +14,7 @@ use tokio::{
 #[async_trait::async_trait]
 pub trait HarnessState {
     /// Get the solution store for the harness
-    async fn solutions(&self) -> Arc<Mutex<dyn SolutionStore + Send>>;
+    async fn solutions(&self) -> Arc<Mutex<dyn SolutionTracker + Send>>;
     /// Store the file names that the harness can reach through fuzzing
     async fn set_covered_files(&mut self, covered_files: Vec<String>);
     /// Get the file names that the harness can reach through fuzzing
@@ -56,7 +56,7 @@ pub type SharedHarnessMap = Arc<Mutex<HarnessMap>>;
 
 pub struct PersistentHarnessState {
     covered_files: HashSet<String>,
-    solutions: Arc<Mutex<dyn SolutionStore + Send>>,
+    solutions: Arc<Mutex<dyn SolutionTracker + Send>>,
     path: PathBuf,
     stats_file: File,
 }
@@ -84,7 +84,7 @@ impl PersistentHarnessState {
             .unwrap();
 
         Self {
-            solutions: Arc::new(Mutex::new(InMemorySolutionStore::default())),
+            solutions: Arc::new(Mutex::new(InMemorySolutionTracker::default())),
             covered_files,
             path,
             stats_file,
@@ -94,7 +94,7 @@ impl PersistentHarnessState {
 
 #[async_trait::async_trait]
 impl HarnessState for PersistentHarnessState {
-    async fn solutions(&self) -> Arc<Mutex<dyn SolutionStore + Send>> {
+    async fn solutions(&self) -> Arc<Mutex<dyn SolutionTracker + Send>> {
         self.solutions.clone()
     }
 
