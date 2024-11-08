@@ -229,6 +229,8 @@ impl CampaignScheduler for CoverageBasedScheduler {
                 for (harness_name, harness) in harnesses.iter() {
                     let harness = harness.lock().await;
 
+                    // Add harness to the coverage based schedule if it doesn't cover any files yet
+                    // (i.e. it is a new harness) or if it covers the modified file.
                     if harness.state().covered_files().await.len() > 0
                         && !harness.state().covers_file(file.to_string()).await
                     {
