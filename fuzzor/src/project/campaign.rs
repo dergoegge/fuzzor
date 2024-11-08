@@ -120,7 +120,7 @@ where
 
             let solutions = self.harness.lock().await.state().solutions().await;
 
-            let new_solution = solutions.lock().await.store(solution.clone());
+            let new_solution = solutions.lock().await.submit(solution.clone());
 
             if new_solution {
                 log::info!(

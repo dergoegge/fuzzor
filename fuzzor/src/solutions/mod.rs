@@ -101,9 +101,13 @@ impl Solution {
     }
 }
 
-pub trait SolutionStore {
-    fn store(&mut self, solution: Solution) -> bool;
-    fn get(&self, id: &str) -> Option<&Solution>;
+pub trait SolutionTracker {
+    /// Mark a solution as resolved (e.g. underlying bug was fixed).
+    fn mark_as_resolved(&mut self, id: &str) -> Option<Solution>;
+    /// Submit a solution to the tracker. Returns whether or this was a new solution.
+    fn submit(&mut self, solution: Solution) -> bool;
+    /// Retrieve an open solution from the tracker by its deduplication id.
+    fn get_open(&self, id: &str) -> Option<&Solution>;
 }
 
 // Split a string by `delim` while also ensuring that each split has an equal number of '(' and
