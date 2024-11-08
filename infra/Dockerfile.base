@@ -52,72 +52,33 @@ RUN --mount=type=cache,target=/ccache/ \
           -DLLVM_USE_SANITIZER=MemoryWithOrigins && \
     ninja -C /libcxx_msan "-j$(nproc)"
 
-FROM debian:sid-slim
+# We could use the official rust: images here, but they are based on
+# earlier versions of Debian, that lead to issues when trying to run
+# the sid-built clang from llvm_builder
+FROM debian:sid-slim AS rust_builder
 
-ARG GCC_V
-ENV GCC_V=$GCC_V
-
-COPY --from=LLVM_BUILDER /llvm_build* /usr/
-COPY --from=LLVM_BUILDER /libcxx_msan /libcxx_msan
+COPY --from=llvm_builder /llvm_build* /usr/
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-  autotools-dev \
-  automake \
-  binutils-dev \
-  build-essential \
-  ccache \
-  cmake \
   curl \
-  cpio \
-  gcc-${GCC_V}-arm-linux-gnueabihf \
-  g++-${GCC_V}-arm-linux-gnueabihf \
-  gcc-${GCC_V}-x86-64-linux-gnu \
-  g++-${GCC_V}-x86-64-linux-gnu \
-  gcc-${GCC_V}-plugin-dev \
+  gcc \
   git \
-  gnuplot \
-  libgtk-3-dev \
-  libtool \
-  libunwind-dev \
-  libz3-dev \
-  linux-perf \
+  libglib2.0-dev \
+  make \
+  meson \
   ninja-build \
-  openssh-client \
   pkg-config \
-  pax-utils \
-  python3 \
-  python3-msgpack \
-  python3-jinja2 \
-  python3-venv \
-  rsync
+  python3-venv
 
-RUN git clone https://github.com/rui314/mold.git --depth 1 --branch v2.34.1
-RUN cmake -G Ninja -B /mold/build -S mold -DCMAKE_BUILD_TYPE=Release && \
-    ninja -C /mold/build/ "-j$(nproc)" install/strip \
-    && rm -rf /mold
-
-# Force mold usage
-RUN rm -rf $(which ld) && ln -s $(which mold) /usr/bin/ld
-
-RUN git clone https://github.com/google/honggfuzz.git
-RUN cd honggfuzz && make -j$(nproc) install
-
-# Clone AFLplusplus and build
-RUN git clone --branch stable https://github.com/AFLplusplus/AFLplusplus
-RUN make -C AFLplusplus PERFORMANCE=1 \
-                        LLVM_CONFIG=llvm-config \
-                        # actually mold
-                        AFL_REAL_LD=/usr/bin/ld \
-                        install -j$(nproc) \
-    && rm -rf AFLplusplus
-
-# Install rust
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Install FlameGraph
-RUN git clone --depth 1 https://github.com/brendangregg/FlameGraph
-ENV FLAMEGRAPH_REPO=/FlameGraph
+RUN cargo install rustfilt
+
+RUN git clone https://github.com/dergoegge/semsan.git
+RUN cd semsan && cargo install --path . --verbose \
+              && cargo install --features qemu_arm --bin semsan-arm --path . \
+              && cargo install --features qemu_x86_64 --bin semsan-x86_64 --path .
 
 WORKDIR /types
 COPY ./types/Cargo.toml ./types/Cargo.lock .
@@ -161,11 +122,77 @@ RUN mkdir .cargo && cargo vendor > .cargo/config
 COPY ./coverage-reporter/src/ src
 RUN cargo install --path . --verbose
 
-RUN cargo install rustfilt
+FROM debian:sid-slim
 
-WORKDIR /
-RUN git clone https://github.com/dergoegge/semsan.git
-RUN cd semsan && cargo install --path . --verbose
+ARG GCC_V
+ENV GCC_V=$GCC_V
+
+COPY --from=llvm_builder /llvm_build* /usr/
+COPY --from=llvm_builder /libcxx_msan /libcxx_msan
+# Be selective, so we don't copy rustc/cargo etc, which may interfere
+# with other builds later, i.e rust-lightning
+COPY --from=rust_builder /root/.cargo/bin/builder \
+                         /root/.cargo/bin/coverage-reporter \
+                         /root/.cargo/bin/ensemble-fuzz \
+                         /root/.cargo/bin/fuzzer \
+                         /root/.cargo/bin/minimizer \
+                         /root/.cargo/bin/reproducer \
+                         /root/.cargo/bin/semsam* \
+                         /usr/local/bin/
+
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
+  autotools-dev \
+  automake \
+  binutils-dev \
+  build-essential \
+  ccache \
+  cmake \
+  curl \
+  cpio \
+  gcc-${GCC_V}-arm-linux-gnueabihf \
+  g++-${GCC_V}-arm-linux-gnueabihf \
+  gcc-${GCC_V}-x86-64-linux-gnu \
+  g++-${GCC_V}-x86-64-linux-gnu \
+  gcc-${GCC_V}-plugin-dev \
+  git \
+  gnuplot \
+  libtool \
+  libunwind-dev \
+  libz3-dev \
+  linux-perf \
+  ninja-build \
+  openssh-client \
+  pkg-config \
+  pax-utils \
+  python3 \
+  python3-msgpack \
+  python3-jinja2 \
+  python3-venv \
+  rsync
+
+# Build & force mold usage
+RUN git clone https://github.com/rui314/mold.git --depth 1 --branch v2.34.1 && \
+    cmake -G Ninja -B /mold/build -S mold -DCMAKE_BUILD_TYPE=Release && \
+    ninja -C /mold/build/ "-j$(nproc)" install/strip && \
+    rm -rf /mold && \
+    rm -rf $(which ld) && ln -s $(which mold) /usr/bin/ld
+
+RUN git clone https://github.com/google/honggfuzz.git && \
+    make install -C honggfuzz && \
+    rm -rf honggfuzz
+
+# Clone AFLplusplus and build
+RUN git clone --branch stable https://github.com/AFLplusplus/AFLplusplus && \
+    make -C AFLplusplus PERFORMANCE=1 \
+                        LLVM_CONFIG=llvm-config \
+                        # actually mold
+                        AFL_REAL_LD=/usr/bin/ld \
+                        install -j$(nproc) && \
+    rm -rf AFLplusplus
+
+# Install FlameGraph
+RUN git clone --depth 1 https://github.com/brendangregg/FlameGraph
+ENV FLAMEGRAPH_REPO=/FlameGraph
 
 COPY ./toolchains toolchains
 
