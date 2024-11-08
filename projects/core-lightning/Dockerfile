@@ -14,7 +14,6 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
 
 COPY ./config.yaml .
 COPY ./build.sh .
-COPY ./all-fuzz-programs.patch .
 
 ARG OWNER=ElementsProject
 ARG REPO=lightning

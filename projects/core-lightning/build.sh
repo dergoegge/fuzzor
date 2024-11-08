@@ -6,8 +6,6 @@ pushd lightning
 
 git checkout .
 
-git apply ../all-fuzz-programs.patch
-
 echo "unsigned-integer-overflow:ccan/" >> ../ubsan_suppressions
 
 EXTRA_CONF_OPTS=
