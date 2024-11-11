@@ -77,8 +77,10 @@ RUN cargo install rustfilt
 
 RUN git clone https://github.com/dergoegge/semsan.git
 RUN cd semsan && cargo install --path . --verbose \
+              && cargo install --features qemu_aarch64 --bin semsan-aarch64 --path . \
               && cargo install --features qemu_arm --bin semsan-arm --path . \
-              && cargo install --features qemu_x86_64 --bin semsan-x86_64 --path .
+              && cargo install --features qemu_x86_64 --bin semsan-x86_64 --path . \
+              && cargo install --features qemu_i386 --bin semsan-i386 --path .
 
 WORKDIR /types
 COPY ./types/Cargo.toml ./types/Cargo.lock .
