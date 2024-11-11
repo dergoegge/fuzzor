@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::solutions::{inmemory::InMemorySolutionTracker, SolutionTracker};
+use crate::solutions::{ondisk::OnDiskSolutionTracker, SolutionTracker};
 
 use fuzzor_infra::FuzzerStats;
 use tokio::{
@@ -83,8 +83,12 @@ impl PersistentHarnessState {
             .await
             .unwrap();
 
+        let solution_tracker = OnDiskSolutionTracker::new(path.join("solutions/"))
+            .await
+            .unwrap();
+
         Self {
-            solutions: Arc::new(Mutex::new(InMemorySolutionTracker::default())),
+            solutions: Arc::new(Mutex::new(solution_tracker)),
             covered_files,
             path,
             stats_file,

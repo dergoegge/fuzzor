@@ -1,10 +1,13 @@
 pub mod inmemory;
+pub mod ondisk;
 pub mod reporter;
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use serde::{Deserialize, Serialize};
+use serde_with::{base64::Base64, serde_as};
 use sha1::{Digest, Sha1};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SolutionMetadata {
     /// Crashes come with stack trace
     Crash(String),
@@ -15,10 +18,13 @@ pub enum SolutionMetadata {
 }
 
 /// Solution holds information about an interesting fuzz input.
-#[derive(Clone, Debug)]
+#[serde_as]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Solution {
     id: String,
     unique_id: String,
+
+    #[serde_as(as = "Base64")]
     input_bytes: Vec<u8>,
 
     metadata: SolutionMetadata,
@@ -101,15 +107,16 @@ impl Solution {
     }
 }
 
+#[async_trait::async_trait]
 pub trait SolutionTracker {
     /// Mark a solution as resolved (e.g. underlying bug was fixed).
-    fn mark_as_resolved(&mut self, id: &str) -> Option<Solution>;
+    async fn mark_as_resolved(&mut self, id: &str) -> Option<Solution>;
     /// Submit a solution to the tracker. Returns whether or this was a new solution.
-    fn submit(&mut self, solution: Solution) -> bool;
+    async fn submit(&mut self, solution: Solution) -> bool;
     /// Retrieve an open solution from the tracker by its deduplication id.
-    fn get_open(&self, id: &str) -> Option<&Solution>;
+    async fn get_open(&self, id: &str) -> Option<&Solution>;
     /// Get all solutions in the tracker
-    fn get_all(&self) -> Vec<Solution>;
+    async fn get_all(&self) -> Vec<Solution>;
 }
 
 // Split a string by `delim` while also ensuring that each split has an equal number of '(' and

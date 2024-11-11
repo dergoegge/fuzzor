@@ -122,7 +122,7 @@ where
 
             let solutions = self.harness.lock().await.state().solutions().await;
 
-            let new_solution = solutions.lock().await.submit(solution.clone());
+            let new_solution = solutions.lock().await.submit(solution.clone()).await;
 
             if new_solution {
                 log::info!(
@@ -246,7 +246,7 @@ where
         let existing_solutions = {
             let harness = self.harness.lock().await;
             let state = harness.state();
-            state.solutions().await.lock().await.get_all()
+            state.solutions().await.lock().await.get_all().await
         };
         let solution_set: HashSet<String> =
             HashSet::from_iter(existing_solutions.iter().map(|s| s.id().to_string()));
@@ -283,6 +283,7 @@ where
                                 .lock()
                                 .await
                                 .mark_as_resolved(solution_id)
+                                .await
                                 .expect("Solution has to exist in the tracker at this point");
                             solution
                         };
