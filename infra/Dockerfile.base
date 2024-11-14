@@ -200,6 +200,7 @@ COPY ./toolchains toolchains
 WORKDIR /workdir
 RUN mkdir --parents workspace/corpus
 RUN mkdir --parents workspace/min_corpus
+RUN mkdir --parents workspace/initial_solutions
 
 # CI mode reduces the amount of resources used to build projects images
 ARG FUZZOR_CI=
