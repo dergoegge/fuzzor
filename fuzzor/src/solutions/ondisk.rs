@@ -55,7 +55,7 @@ impl SolutionTracker for OnDiskSolutionTracker {
         let cache_result = self.cache.mark_as_resolved(id).await;
 
         if let Some(solution) = cache_result.as_ref() {
-            if let Err(err) = fs::remove_file(solution_file_name(solution)).await {
+            if let Err(err) = fs::remove_file(self.path.join(solution_file_name(solution))).await {
                 log::error!("Could not remove solution file from disk: {}", err);
             }
         }
