@@ -374,7 +374,7 @@ impl Environment for DockerEnv {
             for file_obj in values["data"][0]["files"].as_array().unwrap().iter() {
                 if file_obj["summary"]["lines"]["covered"].as_i64().unwrap() > 0 {
                     // Collect files that have line coverage
-                    file_names.push(file_obj["filename"].to_string());
+                    file_names.push(file_obj["filename"].as_str().unwrap().to_string());
                 }
             }
 
