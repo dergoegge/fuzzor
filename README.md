@@ -1,97 +1,37 @@
 # Fuzzor
 
-## Usage
+Work in progress continuous fuzzing infrastructure. Mainly build and maintained
+to continuously fuzz [Bitcoin Core](https://github.com/bitcoin/bitcoin) but
+support for adding and fuzzing other projects is available (see `projects/`).
 
-At the moment, fuzzor consists of two utilities: `fuzz-project` and `fuzz-prs`.
+## Features
 
-`fuzz-project` can be used to continuously fuzz a single project. It monitors
-for source code changes on the configure repo and if a new revision is
-detected, it will kick of a new build and subsequent fuzzing campaigns.
+- Crash deduplication
+- Automatic bug reports
+- Automatic coverage report creation
+- Support for major fuzzing engines (AFL++, libFuzzer, honggfuzz, Native
+  Golang)
+- Real-time ensemble fuzzing
+- Pull request fuzzing
+- Coverage based harness scheduling
+- Support for experimental fuzzing engines (e.g. fuzz driven characterization
+  testing with [SemSan](https://github.com/dergoegge/semsan))
 
-All harnesses are fuzzed in a round-robin fashion, unless a new revision was
-build, in which case new harnesses and the harnesses that reach the recently
-modified code are prioritized.
+### Planned Features
 
-```
-Usage: fuzz-project [OPTIONS] --project <PROJECT>
+- Snapshot fuzzing support (e.g. using full-system `libafl_qemu` and/or `nyx`)
+- Concolic fuzzing engine support
+- Automatic bug triaging
 
-Options:
-      --project <PROJECT>
-          Project to fuzz
-      --owner <OWNER>
-          Overwrite the repo owner from the config
-      --repo <REPO>
-          Overwrite the repo from the config
-      --branch <BRANCH>
-          Overwrite the branch from the config
-      --name <NAME>
-          Overwrite the name from the config
-      --harnesses <HARNESSES>
-          Specify the list of harnesses to fuzz
-      --cores-per-build <CORES_PER_BUILD>
-          Number of cores to use for builds [default: 16]
-      --cores-per-campaign <CORES_PER_CAMPAIGN>
-          Number of cores to use for each campaign [default: 16]
-      --campaign-duration <CAMPAIGN_DURATION>
-          Campaign duration in CPU hours [default: 16]
-  -h, --help
-          Print help
-```
+## Bugs discovered by Fuzzor
 
-`fuzz-prs` enables fuzzing of all pull requests of a given project. It tries to
-fuzz any newly introduced harnesses by a given PR, as well as harnesses that
-are able to reach the modified code.
-
-For it to work properly, all harnesses in the base project should have been
-fuzzed with `fuzz-project` (this makes sure that fuzzor has the required
-context for coverage based harness scheduling).
-
-On launch, `fuzz-prs` will fetch all PRs from the repository but it will only
-start fuzzing individual PRs one their next force-push.
-
-```
-Usage: fuzz-prs [OPTIONS] --project <PROJECT>
-
-Options:
-      --project <PROJECT>
-          Project to fuzz
-      --cores-per-build <CORES_PER_BUILD>
-          Number of cores to use for builds [default: 8]
-      --cores-per-campaign <CORES_PER_CAMPAIGN>
-          Number of cores to use for each campaign [default: 8]
-      --campaign-duration <CAMPAIGN_DURATION>
-          Campaign duration in CPU hours [default: 8]
-      --base-campaign-duration <BASE_CAMPAIGN_DURATION>
-          Campaign duration in CPU hours for the base project [default: 8]
-  -h, --help
-          Print help
-```
-
-### Project Integration
-
-### Required: Building the Base Image
-
-The project specific docker images (e.g. `projects/bitcoin/Docker`) all build
-on top of the `fuzzor-base` image, which can be build from the docker file in
-`infra/Dockerfile.base`:
-
-```
-docker build --tag fuzzor-base:latest --file Dockerfile.base .
-```
-
-`FUZZOR_CI` can be used as a build argument to limit resources needed to build
-the base image for e.g. CI runs.
-
-### Environment Variable Settings
-
-- `FUZZOR_KILL_TIMEOUT`: How long to wait before killing a container when
-  trying to stop it gracefully (in seconds)
-- `FUZZOR_GH_TRACK_INTERVAL`: Interval between GitHub API queries for repo
-  events (in seconds)
-- `FUZZOR_CAMPAIGN_INTERVAL`: Interval campaign status inspections (in seconds)
-- `FUZZOR_DOCKER_NOCACHE`: Set to disable docker build cache
-- `FUZZOR_DONT_REMOVE_CONTAINERS`: Set to disable the removal of campaign
-  containers
-- `FUZZOR_GH_TOKEN`: GitHub access token for accesing public repos and
-  reporting solutions
-
+- [core-lightning: fuzz-bolt12-bech32-decode: index 128 out of bounds for type 'const int8_t[128]' (aka 'const signed char[128]')](https://github.com/ElementsProject/lightning/pull/7322)
+- [lnd: FuzzProbability: normalization factor is zero](https://github.com/lightningnetwork/lnd/issues/9085)
+- [lnd: FuzzReplyChannelRange: failed to encode message to buffer](https://github.com/lightningnetwork/lnd/pull/9084)
+- [bitcoin: wallet_bdb_parser: BDB builtin encryption is not supported](https://github.com/bitcoin/bitcoin/issues/30166)
+- [bitcoin #30243: mocked_descriptor_parse: Assertion '(leaf_version & ~TAPROOT_LEAF_MASK) == 0' failed](https://github.com/bitcoin/bitcoin/pull/30243#issuecomment-2169240015)
+- [bitcoin: rpc: runtime error: reference binding to null pointer of type 'const value_type' (aka 'const CTxOut')](https://github.com/bitcoin/bitcoin/pull/29855)
+- [bitcoin: script: Assertion '!extract_destination_ret' failed.](https://github.com/bitcoin/bitcoin/issues/30615)
+- [bitcoin: scriptpubkeyman: heap-buffer-overflow miniscript.cpp in CScript BuildScript](https://github.com/bitcoin/bitcoin/issues/30864)
+- [bitcoin: p2p_headers_presync: Assertion 'total_work < chainman.MinimumChainWork()' failed](https://github.com/bitcoin/bitcoin/pull/31213)
+- [bitcoin: connman: terminate called after throwing an instance of 'std::bad_alloc']()
