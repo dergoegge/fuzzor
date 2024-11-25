@@ -6,14 +6,15 @@ support for adding and fuzzing other projects is available (see `projects/`).
 
 ## Features
 
-- Crash deduplication
 - Automatic bug reports
 - Automatic coverage report creation
 - Support for major fuzzing engines (AFL++, libFuzzer, honggfuzz, Native
   Golang)
+- Crash deduplication
+- Corpus minimization with all supported engines
 - Real-time ensemble fuzzing
 - Pull request fuzzing
-- Coverage based harness scheduling
+- Coverage based campaign scheduling
 - Support for experimental fuzzing engines (e.g. fuzz driven characterization
   testing with [SemSan](https://github.com/dergoegge/semsan))
 
