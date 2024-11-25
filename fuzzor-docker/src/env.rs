@@ -112,6 +112,11 @@ impl DockerEnv {
                 privileged: Some(true), // for performance
                 cpuset_cpus: Some(cpuset_cpus),
                 tmpfs: Some(tmpfs),
+                ulimits: Some(vec![bollard::models::ResourcesUlimits {
+                    name: Some("stack".to_string()),
+                    soft: Some(512 * 1024),
+                    hard: Some(512 * 1024),
+                }]),
                 ..Default::default()
             }),
             ..Default::default()
