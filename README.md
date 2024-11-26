@@ -8,24 +8,36 @@ support for adding and fuzzing other projects is available (see `projects/`).
 
 - Automatic bug reports
 - Automatic coverage report creation
-- Support for major fuzzing engines (AFL++, libFuzzer, honggfuzz, Native
-  Golang)
+- Support for major fuzzing engines
+  ([`AFL++`](https://github.com/AFLplusplus/AFLplusplus),
+  [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html),
+  [`honggfuzz`](https://github.com/google/honggfuzz), [`Native
+  Golang`](https://go.dev/doc/security/fuzz/))
 - Crash deduplication
 - Corpus minimization with all supported engines
 - Real-time ensemble fuzzing
-- Pull request fuzzing
 - Coverage based campaign scheduling
 - Support for experimental fuzzing engines (e.g. fuzz driven characterization
   testing with [SemSan](https://github.com/dergoegge/semsan))
 
 ### Planned Features
 
-- Snapshot fuzzing support (e.g. using full-system `libafl_qemu` and/or `nyx`)
+- Support for more fuzzing engines (e.g.
+  [`Radamsa`](https://gitlab.com/akihe/radamsa),
+  [`libafl_libfuzzer`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl_libfuzzer),
+  [`libafl-fuzz`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/forkserver/libafl-fuzz),
+  ...)
+- Snapshot fuzzing support (e.g. using full-system
+  [`libafl_qemu`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl_qemu)
+  and/or [`nyx`](https://nyx-fuzz.com/))
 - Concolic fuzzing engine support
 - Automatic bug triaging
+- Automatic pull request fuzzing
 
 ## Bugs discovered by Fuzzor
 
+- [core-lightning: fuzz-connectd-handshake-act2: Assertion 'write_count == 1 && "too many calls to io_write()"' failed]()
+- [core-lightning: fuzz-cryptomsg: Assertion 'cryptomsg_decrypt_body(buf, &cs_in, buf) == NULL' failed]()
 - [core-lightning: fuzz-bolt12-bech32-decode: index 128 out of bounds for type 'const int8_t[128]' (aka 'const signed char[128]')](https://github.com/ElementsProject/lightning/pull/7322)
 - [lnd: FuzzProbability: normalization factor is zero](https://github.com/lightningnetwork/lnd/issues/9085)
 - [lnd: FuzzReplyChannelRange: failed to encode message to buffer](https://github.com/lightningnetwork/lnd/pull/9084)
