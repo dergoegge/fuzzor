@@ -2,7 +2,11 @@
 
 set -xe
 
-pushd $REPO/fuzz
+pushd $REPO
+
+git apply ../log_level.patch || true
+
+pushd fuzz/
 
 ls src/bin/*.rs | sed "s/src\/bin\///g" | sed "s/\.rs//g" > /tmp/a
 
@@ -20,4 +24,5 @@ for fuzz_target in ${FUZZ_TARGETS[@]}; do
   fi
 done
 
-popd # $REPO/fuzz
+popd # fuzz/
+popd # $REPO
