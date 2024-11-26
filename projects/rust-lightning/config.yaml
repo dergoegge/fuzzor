@@ -2,6 +2,7 @@ name: rust-lightning
 
 owner: lightningdevkit
 repo: rust-lightning
+branch: main
 
 language: Rust
 ccs:
