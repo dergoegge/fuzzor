@@ -10,7 +10,11 @@ use tokio::sync::Mutex;
 
 use ensemble::start_ensemble_task;
 use fuzzer::{
-    recommended_aflpp_settings, AflppFuzzer, HonggFuzzer, LibFuzzer, NativeGoFuzzer, SemSanFuzzer,
+    aflpp::{recommended_aflpp_settings, AflppFuzzer},
+    honggfuzz::HonggFuzzer,
+    libfuzzer::LibFuzzer,
+    native_go::NativeGoFuzzer,
+    semsan::SemSanFuzzer,
     SharedFuzzer,
 };
 use options::EnsembleOptions;
