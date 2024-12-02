@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::future::Future;
 use std::sync::Arc;
 
 use crate::solutions::Solution;
@@ -36,15 +35,6 @@ pub trait Environment {
     async fn ping(&self) -> Result<bool, String>;
 }
 
-/// EnvironmentAllocationError represents possible environment allocation errors
-#[derive(Debug)]
-pub enum EnvironmentAllocationError {
-    /// Requsted architecture was not available to the allocator
-    ArchNotAvailable,
-}
-
-unsafe impl Send for EnvironmentAllocationError {}
-
 #[derive(Clone)]
 pub struct EnvironmentParams {
     /// Docker image to use for the environment
@@ -62,19 +52,18 @@ pub struct EnvironmentParams {
 /// EnvironmentAllocator allocation of environments for fuzzing campaigns.
 ///
 /// Note: it only manages the allocation of resources (e.g. available CPU cores or architectures).
+#[async_trait]
 pub trait EnvironmentAllocator<E>
 where
     E: Environment,
 {
     /// Allocate a new environment from the allocator.
-    fn alloc(
-        &mut self,
-        opts: EnvironmentParams,
-    ) -> impl Future<Output = Result<E, EnvironmentAllocationError>> + Send;
+    async fn alloc(&mut self, opts: EnvironmentParams) -> Result<E, String>;
+
     /// Free an environment by giving it back to the allocator.
     ///
     /// A freed environment might be re-allocated in a future [alloc] call.
-    fn free(&mut self, env: E) -> impl Future<Output = bool> + Send;
+    async fn free(&mut self, env: E) -> bool;
 }
 
 #[derive(Clone)]

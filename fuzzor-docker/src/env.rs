@@ -3,10 +3,7 @@ use std::io::Read;
 use std::str::FromStr;
 
 use fuzzor::{
-    env::{
-        Environment, EnvironmentAllocationError, EnvironmentAllocator, EnvironmentParams,
-        ResourcePool,
-    },
+    env::{Environment, EnvironmentAllocator, EnvironmentParams, ResourcePool},
     solutions::Solution,
 };
 
@@ -527,11 +524,9 @@ impl DockerEnvAllocator {
     }
 }
 
+#[async_trait]
 impl EnvironmentAllocator<DockerEnv> for DockerEnvAllocator {
-    async fn alloc(
-        &mut self,
-        opts: EnvironmentParams,
-    ) -> Result<DockerEnv, EnvironmentAllocationError> {
+    async fn alloc(&mut self, opts: EnvironmentParams) -> Result<DockerEnv, String> {
         let machine = self.machines.take_one().await;
 
         Ok(DockerEnv::new(machine, self.registry.clone(), opts).await)
