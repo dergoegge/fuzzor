@@ -45,6 +45,8 @@ pub struct GitHubRevisionTracker {
     github: octocrab::Octocrab,
 
     interval: time::Interval,
+
+    resolve_source_cache: Option<(String, String, String)>,
 }
 
 impl GitHubRevisionTracker {
@@ -64,6 +66,7 @@ impl GitHubRevisionTracker {
                 .build()
                 .unwrap(),
             interval: time::interval(interval),
+            resolve_source_cache: None,
         }
     }
 
@@ -71,11 +74,22 @@ impl GitHubRevisionTracker {
         &self.source
     }
 
-    pub async fn lookup_branch(&self) -> String {
+    pub async fn lookup_branch(&mut self) -> String {
         self.resolve_source().await.2
     }
 
-    async fn resolve_source(&self) -> (String, String, String) {
+    async fn resolve_source(&mut self) -> (String, String, String) {
+        if self.resolve_source_cache.is_none() {
+            // Do the actual lookup (GitHub API call) and populate the cache only on the first
+            // call.
+            self.resolve_source_cache = Some(self.inner_resolve_source().await);
+        }
+
+        self.resolve_source_cache
+            .clone()
+            .expect("Cache must be populated here")
+    }
+    async fn inner_resolve_source(&self) -> (String, String, String) {
         return match &self.source.1 {
             GithubRevisionSource::Branch(name) => (
                 self.source.0.owner.clone(),
@@ -244,7 +258,7 @@ impl GitHubRevisionTracker {
 #[async_trait::async_trait]
 impl RevisionTracker<GitHubRevision> for GitHubRevisionTracker {
     async fn track(&mut self, current: Option<GitHubRevision>) -> GitHubRevision {
-        let (owner, repo, branch) = self.resolve_source().await; // TODO this could be cached
+        let (owner, repo, branch) = self.resolve_source().await;
 
         // Poll the GithubApi every now and then until a new revision is detected and returned.
         loop {
