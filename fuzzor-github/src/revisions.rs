@@ -42,20 +42,28 @@ pub struct GitHubRepository {
 /// GitHubRevisionTracker tracks software revisions hosted in GitHub repositories.
 pub struct GitHubRevisionTracker {
     source: (GitHubRepository, GithubRevisionSource),
-
-    pub track_interval: Option<u64>,
     github: octocrab::Octocrab,
+
+    interval: time::Interval,
 }
 
 impl GitHubRevisionTracker {
     pub fn new(access_token: String, repo: GitHubRepository, source: GithubRevisionSource) -> Self {
+        let default_interval_seconds = time::Duration::from_secs(60 * 60 * 12); // 12h
+        let interval = std::env::var("FUZZOR_GH_TRACK_INTERVAL")
+            .map(|v| {
+                v.parse()
+                    .expect("FUZZOR_GH_TRACK_INTERVAL should be a value in seconds")
+            })
+            .map_or(default_interval_seconds, time::Duration::from_secs);
+
         GitHubRevisionTracker {
             source: (repo, source),
-            track_interval: None,
             github: octocrab::Octocrab::builder()
                 .user_access_token(access_token)
                 .build()
                 .unwrap(),
+            interval: time::interval(interval),
         }
     }
 
@@ -238,23 +246,13 @@ impl RevisionTracker<GitHubRevision> for GitHubRevisionTracker {
     async fn track(&mut self, current: Option<GitHubRevision>) -> GitHubRevision {
         let (owner, repo, branch) = self.resolve_source().await; // TODO this could be cached
 
-        // Poll the GithubApi every `self.track_interval` until a new revision is detected and
-        // returned.
+        // Poll the GithubApi every now and then until a new revision is detected and returned.
         loop {
+            self.interval.tick().await;
+
             if let Some(revision) = self.inner_track(&owner, &repo, &branch, &current).await {
                 return revision;
             }
-
-            let default_interval_seconds = 60 * 60 * 12;
-            let interval =
-                std::env::var("FUZZOR_GH_TRACK_INTERVAL").map_or(default_interval_seconds, |val| {
-                    val.parse()
-                        .expect("FUZZOR_GH_TRACK_INTERVAL should be a value in seconds")
-                });
-            time::sleep(time::Duration::from_secs(
-                self.track_interval.unwrap_or(interval),
-            ))
-            .await;
         }
     }
 }
