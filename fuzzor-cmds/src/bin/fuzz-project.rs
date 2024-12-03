@@ -149,7 +149,8 @@ async fn main() -> Result<(), String> {
     let opts = Options::parse();
 
     let config = fs::read_to_string(&opts.infra_spec).await.unwrap();
-    let mut infra: Infrastructure = serde_yaml::from_str(&config).unwrap();
+    let mut infra: Infrastructure = serde_yaml::from_str(&config)
+        .map_err(|e| format!("Could not parse infra spec file {:?}", e))?;
     log::info!("{:?}", infra);
 
     let access_token = std::env::var("FUZZOR_GH_TOKEN").map_err(|_| {
@@ -158,8 +159,16 @@ async fn main() -> Result<(), String> {
         )
     })?;
 
+    // Use directory specified by the `FUZZOR_PROJECTS_DIR` env variable or use `./projects/` as
+    // default.
     let mut folder = InMemoryProjectFolder::from_folder(
-        ProjectFolder::new(PathBuf::from(format!("./projects/{}", opts.project))).unwrap(),
+        ProjectFolder::new(
+            PathBuf::from(
+                std::env::var("FUZZOR_PROJECTS_DIR").unwrap_or(String::from("./projects/")),
+            )
+            .join(opts.project),
+        )
+        .unwrap(),
     );
 
     if let Some(owner) = opts.owner.clone() {
@@ -223,10 +232,11 @@ async fn main() -> Result<(), String> {
         ))
     };
 
-    let state_location = homedir::get_my_home()
-        .unwrap()
-        .unwrap()
-        .join(".fuzzor")
+    // Use directory specified by the `FUZZOR_STATE_DIR` env variable or use `$HOME/.fuzzor` as
+    // default.
+    let state_location = std::env::var("FUZZOR_STATE_DIR")
+        .map(PathBuf::from)
+        .unwrap_or(homedir::get_my_home().unwrap().unwrap().join(".fuzzor"))
         .join(folder.config().name);
 
     let corpus_herder = VersionedOverwritingHerder::new(
