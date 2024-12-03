@@ -240,6 +240,25 @@ where
 
         log::trace!("Harnesses found in image '{}': {:?}", &tag, &harnesses);
 
+        // Prune unused and untagged images
+        let mut filters = HashMap::new();
+        filters.insert("dangling", vec!["1"]);
+        match docker
+            .prune_images(Some(bollard::image::PruneImagesOptions { filters }))
+            .await
+        {
+            Ok(prune_result) => {
+                log::info!(
+                    "Pruned {} images and reclaimed {} GiB of disk space!",
+                    prune_result.images_deleted.map_or(0, |imgs| imgs.len()),
+                    prune_result.space_reclaimed.unwrap_or(0) / (1024 * 1024 * 1024),
+                );
+            }
+            Err(e) => {
+                log::warn!("Could not prune dangling images: {:?}", e);
+            }
+        };
+
         Ok(ProjectBuild::new(harnesses, revision))
     }
 }
