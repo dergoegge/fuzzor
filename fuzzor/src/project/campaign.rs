@@ -35,7 +35,7 @@ pub enum CampaignEvent {
     /// Stats fires when new fuzzing stats are available
     Stats(String, FuzzerStats),
     /// Quit fires when a campaign task quits
-    Quit(String, bool, Option<Vec<u8>>),
+    Quit(String, Option<Vec<u8>>),
 }
 
 pub struct Campaign<E> {
@@ -378,13 +378,8 @@ where
         };
 
         if !kill {
-            self.send_event(CampaignEvent::Quit(
-                self.harness_name.clone(),
-                // Only free the environment if the campaign actually ended.
-                campaign_ended,
-                corpus,
-            ))
-            .await;
+            self.send_event(CampaignEvent::Quit(self.harness_name.clone(), corpus))
+                .await;
         }
 
         log::info!(

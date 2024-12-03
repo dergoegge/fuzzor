@@ -269,7 +269,7 @@ where
                     self.config.name,
                 );
             }
-            CampaignEvent::Quit(harness, _ended, corpus) => {
+            CampaignEvent::Quit(harness, corpus) => {
                 if let Some((handle, _)) = self.campaigns.remove(&harness) {
                     self.finish_campaign(harness, handle, corpus).await;
                 } else {
