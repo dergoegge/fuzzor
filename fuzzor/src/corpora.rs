@@ -1,12 +1,15 @@
 use std::future::Future;
 use std::path::PathBuf;
 
+use async_trait::async_trait;
+
 /// CorpusHerder acts a single source for corpora.
+#[async_trait]
 pub trait CorpusHerder<C: Send> {
     /// Merge new inputs into its existing corpus.
-    fn merge(&mut self, harness: String, corpus: C) -> impl Future<Output = Result<(), String>>;
+    async fn merge(&mut self, harness: String, corpus: C) -> Result<(), String>;
     /// Get the latest corpus for a given harness.
-    fn fetch(&self, harness: String) -> impl Future<Output = Result<C, String>> + Send;
+    async fn fetch(&self, harness: String) -> Result<C, String>;
 }
 
 /// VersionedOverwritingHerder stores corpora for projects on disk in form of a git repository.
@@ -87,6 +90,7 @@ impl VersionedOverwritingHerder {
     }
 }
 
+#[async_trait]
 impl CorpusHerder<Vec<u8>> for VersionedOverwritingHerder {
     async fn merge(&mut self, harness: String, corpus: Vec<u8>) -> Result<(), String> {
         let corpus_dir = self.get_corpus_dir(&harness);
