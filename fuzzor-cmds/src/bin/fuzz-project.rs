@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use fuzzor::{
     corpora::VersionedOverwritingHerder,
@@ -210,7 +211,7 @@ async fn main() -> Result<(), String> {
     let scheduler: Box<dyn CampaignScheduler + Send> = if let Some(harnesses) = opts.harnesses {
         Box::new(OneShotScheduler::new(
             folder.config(),
-            opts.campaign_duration,
+            Duration::from_secs(opts.campaign_duration * 60 * 60),
             harnesses,
         ))
     } else {
@@ -218,7 +219,7 @@ async fn main() -> Result<(), String> {
         // robin campaign scheduling when necessary.
         Box::new(CoverageBasedScheduler::with_round_robin_fallback(
             folder.config(),
-            opts.campaign_duration,
+            Duration::from_secs(opts.campaign_duration * 60 * 60),
         ))
     };
 

@@ -53,7 +53,7 @@ impl DockerEnv {
 
         let fuzz_cmd = format!(
             "fuzzer --duration {} --workspace ./workspace ./config.yaml {}",
-            params.duration.to_string(),
+            (params.duration.as_secs() / 60 / 60),
             &params.harness_name
         );
 

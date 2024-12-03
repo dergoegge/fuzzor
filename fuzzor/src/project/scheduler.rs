@@ -1,4 +1,5 @@
 use std::collections::{HashSet, VecDeque};
+use std::time::Duration;
 
 use super::harness::*;
 use super::ProjectConfig;
@@ -32,7 +33,7 @@ pub struct RoundRobinCampaignScheduler {
     // Index of the next harness to be returned from `current_schedule`
     next_harness: usize,
     // Fuzz duration for each campaign
-    duration: u64,
+    duration: Duration,
     // Config of the project that this schedule belongs to
     project_config: ProjectConfig,
     // Set of harness names that are active
@@ -42,7 +43,7 @@ pub struct RoundRobinCampaignScheduler {
 unsafe impl Send for RoundRobinCampaignScheduler {}
 
 impl RoundRobinCampaignScheduler {
-    pub fn new(project_config: ProjectConfig, duration: u64) -> Self {
+    pub fn new(project_config: ProjectConfig, duration: Duration) -> Self {
         Self {
             current_schedule: Vec::new(),
             next_harness: 0,
@@ -109,7 +110,7 @@ pub struct CoverageBasedScheduler {
     // Current campaign schedule, the next harness is poped from the front.
     schedule: VecDeque<String>,
     // Fuzz duration for each campaign
-    duration: u64,
+    duration: Duration,
     // Config of the project that this schedule belongs to
     project_config: ProjectConfig,
 
@@ -119,7 +120,7 @@ pub struct CoverageBasedScheduler {
 impl CoverageBasedScheduler {
     pub fn new(
         project_config: ProjectConfig,
-        duration: u64,
+        duration: Duration,
         base_harnesses: SharedHarnessMap,
     ) -> Self {
         Self {
@@ -133,7 +134,7 @@ impl CoverageBasedScheduler {
 
     /// Create a CoverageBasedScheduler that will fall back to round robin scheduling once finished
     /// with fuzzing the harnesses that reached the modified files.
-    pub fn with_round_robin_fallback(project_config: ProjectConfig, duration: u64) -> Self {
+    pub fn with_round_robin_fallback(project_config: ProjectConfig, duration: Duration) -> Self {
         Self {
             base_harnesses: None,
             schedule: VecDeque::new(),
@@ -270,12 +271,12 @@ pub struct OneShotScheduler {
     harnesses: Vec<String>,
     schedule: VecDeque<String>,
 
-    duration: u64,
+    duration: Duration,
     project_config: ProjectConfig,
 }
 
 impl OneShotScheduler {
-    pub fn new(project_config: ProjectConfig, duration: u64, harnesses: Vec<String>) -> Self {
+    pub fn new(project_config: ProjectConfig, duration: Duration, harnesses: Vec<String>) -> Self {
         Self {
             harnesses,
             schedule: VecDeque::new(),

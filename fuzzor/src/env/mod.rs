@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::solutions::Solution;
 
@@ -44,7 +45,7 @@ pub struct EnvironmentParams {
     /// Name of the harness to be fuzzed
     pub harness_name: String,
     /// Fuzz duration in seconds
-    pub duration: u64,
+    pub duration: Duration,
     /// Config of the owning project
     pub project_config: ProjectConfig,
 }

@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use fuzzor::{
     corpora::VersionedOverwritingHerder,
@@ -156,7 +157,7 @@ impl PullRequestManager {
 
         let scheduler = Box::new(CoverageBasedScheduler::new(
             folder.config(),
-            self.opts.campaign_duration,
+            Duration::from_secs(self.opts.campaign_duration * 60 * 60),
             self.parent_harnesses.clone(),
         ));
 
@@ -325,7 +326,7 @@ async fn main() -> Result<(), String> {
     // robin campaign scheduling when necessary.
     let scheduler = Box::new(CoverageBasedScheduler::with_round_robin_fallback(
         folder.config(),
-        opts.base_campaign_duration,
+        Duration::from_secs(opts.base_campaign_duration * 60 * 60),
     ));
 
     // $HOME/.fuzzor/<project name>
