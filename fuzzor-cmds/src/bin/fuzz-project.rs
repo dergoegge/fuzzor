@@ -8,11 +8,12 @@ use fuzzor::{
     project::{
         campaign::CampaignEvent,
         description::{InMemoryProjectFolder, ProjectDescription, ProjectFolder},
-        monitor::{ProjectMonitor, SolutionReportingMonitor},
+        monitor::{ProjectMonitor, QuittingBuildFailureMonitor, SolutionReportingMonitor},
         scheduler::{CampaignScheduler, CoverageBasedScheduler, OneShotScheduler},
         state::StdProjectState,
         Project, ProjectEvent, ProjectOptions,
     },
+    solutions::reporter::{QuittingSolutionReporter, StdErrSolutionReporter},
 };
 use fuzzor_docker::{
     builder::DockerBuilder,
@@ -48,16 +49,9 @@ struct Options {
 
     #[arg(
         long = "report-repo",
-        help = "GitHub repository for bug reports",
-        required = true
+        help = "GitHub repository for bug reports (format: '<owner>/<repo>')"
     )]
-    report_repo: String,
-    #[arg(
-        long = "report-repo-owner",
-        help = "Owner of the GitHub repository for bug reports",
-        required = true
-    )]
-    report_repo_owner: String,
+    report_repo: Option<String>,
 
     #[arg(long = "owner", help = "Overwrite the repo owner from the config")]
     owner: Option<String>,
@@ -257,23 +251,38 @@ async fn main() -> Result<(), String> {
         },
     );
 
-    let solution_monitor = SolutionReportingMonitor::new(GitHubRepoSolutionReporter::new(
-        &opts.report_repo_owner,
-        &opts.report_repo,
-        &access_token,
-        config.ccs.clone(),
-    ));
-    project.register_monitor(Box::new(solution_monitor));
+    let (quit_tx, quit_rx) = tokio::sync::mpsc::channel(16);
 
-    let build_monitor = GitHubReportingBuildFailureMonitor::new(
-        &opts.report_repo_owner,
-        &opts.report_repo,
-        &access_token,
-        config.ccs.clone(),
-    );
-    project.register_monitor(Box::new(build_monitor));
+    if let Some(report_repo) = &opts.report_repo {
+        let (owner, repo) = {
+            let split: Vec<&str> = report_repo.split("/").collect();
+            assert!(split.len() == 2);
+            (split[0], split[1])
+        };
 
-    let (_quit_tx, quit_rx) = tokio::sync::mpsc::channel(16);
+        let solution_monitor = SolutionReportingMonitor::new(GitHubRepoSolutionReporter::new(
+            owner,
+            repo,
+            &access_token,
+            config.ccs.clone(),
+        ));
+        project.register_monitor(Box::new(solution_monitor));
+
+        let build_monitor =
+            GitHubReportingBuildFailureMonitor::new(owner, repo, &access_token, config.ccs.clone());
+        project.register_monitor(Box::new(build_monitor));
+    } else {
+        log::warn!("Solutions are logged to StdErr and won't be persisted!");
+
+        project.register_monitor(Box::new(SolutionReportingMonitor::new(
+            QuittingSolutionReporter::new(StdErrSolutionReporter {}, quit_tx.clone()),
+        )));
+
+        project.register_monitor(Box::new(QuittingBuildFailureMonitor {
+            quit_project_sender: quit_tx.clone(),
+        }));
+    }
+
     project.run(gh_tracker, builder, quit_rx).await;
 
     Ok(())

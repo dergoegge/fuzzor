@@ -4,6 +4,7 @@ use fuzzor::solutions::{
     SolutionMetadata::{Crash, Differential, Timeout},
 };
 
+use async_trait::async_trait;
 use octocrab::{models::repos::CommitAuthor, Octocrab};
 
 /// A [`SolutionReporter`] that reports new solutions to a GitHub repository.
@@ -69,6 +70,7 @@ async fn upload_file_to_repo(
         .content)
 }
 
+#[async_trait]
 impl SolutionReporter for GitHubRepoSolutionReporter {
     async fn report_new_solution(
         &mut self,

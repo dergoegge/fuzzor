@@ -2,6 +2,8 @@ use super::campaign::CampaignEvent;
 use super::ProjectEvent;
 use crate::solutions::reporter::SolutionReporter;
 
+use tokio::sync::mpsc::Sender;
+
 #[async_trait::async_trait]
 pub trait ProjectMonitor {
     async fn monitor_campaign_event(&mut self, project: String, event: CampaignEvent);
@@ -48,4 +50,19 @@ where
     }
 
     async fn monitor_project_event(&mut self, _project: String, _event: ProjectEvent) {}
+}
+
+#[derive(Clone)]
+pub struct QuittingBuildFailureMonitor {
+    pub quit_project_sender: Sender<()>,
+}
+
+#[async_trait::async_trait]
+impl ProjectMonitor for QuittingBuildFailureMonitor {
+    async fn monitor_campaign_event(&mut self, _project: String, _event: CampaignEvent) {}
+    async fn monitor_project_event(&mut self, _project: String, event: ProjectEvent) {
+        if let ProjectEvent::BuildFailure = event {
+            let _ = self.quit_project_sender.try_send(());
+        }
+    }
 }
