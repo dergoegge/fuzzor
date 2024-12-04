@@ -13,7 +13,6 @@ ARG REVISION=
 RUN git clone --depth 1 --branch $BRANCH https://github.com/$OWNER/$REPO.git
 RUN cd $REPO/fuzz && cargo update && cargo install --force cargo-fuzz
 
-COPY ./log_level.patch .
 COPY ./config.yaml .
 COPY ./build.sh .
 
