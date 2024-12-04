@@ -27,7 +27,7 @@ impl SolutionReporter for StdErrSolutionReporter {
     ) -> Result<(), String> {
         match solution.metadata() {
             SolutionMetadata::Crash(stack_trace) => eprintln!(
-                "New crash id='{}' (project='{}' harness='{}')\n Base64: {} \n ===== stack trace ===== \n {} \n",
+                "New crash id='{}' (project='{}' harness='{}')\nBase64: {}\n===== stack trace ===== \n{}",
                 solution.id(),
                 project,
                 harness,
@@ -35,14 +35,14 @@ impl SolutionReporter for StdErrSolutionReporter {
                 stack_trace
             ),
             SolutionMetadata::Differential(stack_trace) => eprintln!(
-                "New differential solution (project='{}' harness='{}')\n Base64: {} \n ===== stack trace ===== \n {}",
+                "New differential solution (project='{}' harness='{}')\nBase64: {}\n===== stack trace =====\n{}",
                 project,
                 harness,
                 solution.input_base64(),
                 stack_trace
             ),
             SolutionMetadata::Timeout(_) => eprintln!(
-                "New timeout (project='{}' harness='{}')\n Base64: {}", project,
+                "New timeout (project='{}' harness='{}')\nBase64: {}", project,
                 harness,
                 solution.input_base64()
             ),
