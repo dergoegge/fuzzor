@@ -253,7 +253,7 @@ where
         let _ = self.wake_up_scheduler.as_ref().unwrap().try_send(());
     }
 
-    async fn handle_campaign_event(&mut self, event: CampaignEvent) {
+    async fn handle_campaign_event(&mut self, event: CampaignEvent, quitting_project: bool) {
         log::trace!(
             "New campaign event for project '{}': {:?}",
             self.config.name,
@@ -272,7 +272,7 @@ where
             CampaignEvent::Quit(harness, corpus) => {
                 if let Some((handle, _)) = self.campaigns.remove(&harness) {
                     self.finish_campaign(harness, handle, corpus).await;
-                } else {
+                } else if !quitting_project {
                     log::error!(
                         "Received quit event but the campaign was not found (harness={}, project={})",
                         harness,
@@ -359,7 +359,7 @@ where
             tokio::select! {
                 Some(build) = build_rx.recv() => self.handle_build_result(build).await,
                 Some(campaign) = campaign_rx.recv() => self.handle_new_campaign(campaign).await,
-                Some(event) = campaign_event_rx.recv() => self.handle_campaign_event(event).await,
+                Some(event) = campaign_event_rx.recv() => self.handle_campaign_event(event, false).await,
                 q = quit.recv() => {
                     result = q;
                     break;
@@ -386,7 +386,7 @@ where
 
         // Consume all remaining events
         while let Some(event) = campaign_event_rx.recv().await {
-            self.handle_campaign_event(event).await;
+            self.handle_campaign_event(event, true).await;
         }
 
         return result;
