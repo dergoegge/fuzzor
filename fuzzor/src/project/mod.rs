@@ -379,6 +379,11 @@ where
             let _ = campaign_handle.await;
         }
 
+        // Consume all remaining events
+        while let Some(event) = campaign_event_rx.recv().await {
+            self.handle_campaign_event(event).await;
+        }
+
         return result;
     }
 }
