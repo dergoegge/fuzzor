@@ -23,6 +23,7 @@ use fuzzor_github::{
     reporter::GitHubRepoSolutionReporter,
     revisions::{GitHubRepository, GitHubRevisionTracker, GithubRevisionSource},
 };
+use fuzzor_infra::{FuzzEngine, Sanitizer};
 
 use async_trait::async_trait;
 use clap::Parser;
@@ -98,6 +99,9 @@ struct Options {
         default_value_t = 16
     )]
     campaign_duration: u64,
+
+    #[arg(long = "ci", help = "Turn on ci fuzzing mode", default_value_t = false)]
+    ci: bool,
 }
 
 struct GitHubReportingBuildFailureMonitor {
@@ -199,6 +203,18 @@ async fn main() -> Result<(), String> {
     }
     if let Some(name) = opts.name.clone() {
         folder.config_mut().name = name;
+    }
+
+    if opts.ci {
+        // Limit fuzzing to libFuzzer in CI (reduces build times)
+        folder.config_mut().engines = Some(vec![FuzzEngine::LibFuzzer, FuzzEngine::None]);
+        folder.config_mut().sanitizers = Some(vec![
+            Sanitizer::Address,
+            Sanitizer::Undefined,
+            Sanitizer::Memory,
+            Sanitizer::ValueProfile,
+            Sanitizer::None,
+        ]);
     }
 
     let config = folder.config();
