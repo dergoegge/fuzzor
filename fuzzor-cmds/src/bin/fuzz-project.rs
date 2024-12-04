@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -24,9 +24,32 @@ use fuzzor_github::{
     revisions::{GitHubRepository, GitHubRevisionTracker, GithubRevisionSource},
 };
 
+use async_trait::async_trait;
 use clap::Parser;
 use octocrab::Octocrab;
-use tokio::fs;
+use tokio::{fs, sync::mpsc::Sender};
+
+struct QuitAfterCampaignsMonitor {
+    waiting_for: HashSet<String>,
+    quit_project_sender: Sender<bool>,
+}
+
+#[async_trait]
+impl ProjectMonitor for QuitAfterCampaignsMonitor {
+    async fn monitor_campaign_event(&mut self, _project: String, event: CampaignEvent) {
+        match event {
+            CampaignEvent::Quit(harness, _) => {
+                self.waiting_for.remove(&harness);
+
+                if self.waiting_for.is_empty() {
+                    let _ = self.quit_project_sender.try_send(false);
+                }
+            }
+            _ => {}
+        }
+    }
+    async fn monitor_project_event(&mut self, _project: String, _event: ProjectEvent) {}
+}
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 struct Infrastructure {
@@ -211,20 +234,21 @@ async fn main() -> Result<(), String> {
         DockerBuilder::new(builder_pool)
     };
 
-    let scheduler: Box<dyn CampaignScheduler + Send> = if let Some(harnesses) = opts.harnesses {
-        Box::new(OneShotScheduler::new(
-            folder.config(),
-            Duration::from_secs(opts.campaign_duration * 60 * 60),
-            harnesses,
-        ))
-    } else {
-        // Prioritize fuzzing harnesses that reach recently modified files but fall back to round
-        // robin campaign scheduling when necessary.
-        Box::new(CoverageBasedScheduler::with_round_robin_fallback(
-            folder.config(),
-            Duration::from_secs(opts.campaign_duration * 60 * 60),
-        ))
-    };
+    let scheduler: Box<dyn CampaignScheduler + Send> =
+        if let Some(harnesses) = opts.harnesses.clone() {
+            Box::new(OneShotScheduler::new(
+                folder.config(),
+                Duration::from_secs(opts.campaign_duration * 60 * 60),
+                harnesses,
+            ))
+        } else {
+            // Prioritize fuzzing harnesses that reach recently modified files but fall back to round
+            // robin campaign scheduling when necessary.
+            Box::new(CoverageBasedScheduler::with_round_robin_fallback(
+                folder.config(),
+                Duration::from_secs(opts.campaign_duration * 60 * 60),
+            ))
+        };
 
     // Use directory specified by the `FUZZOR_STATE_DIR` env variable or use `$HOME/.fuzzor` as
     // default.
@@ -281,9 +305,23 @@ async fn main() -> Result<(), String> {
         project.register_monitor(Box::new(QuittingBuildFailureMonitor {
             quit_project_sender: quit_tx.clone(),
         }));
+
+        if let Some(harnesses) = opts.harnesses {
+            log::info!(
+                "Will quit after fuzzing the following harnesses: {:?}",
+                harnesses
+            );
+            project.register_monitor(Box::new(QuitAfterCampaignsMonitor {
+                waiting_for: HashSet::from_iter(harnesses.iter().cloned()),
+                quit_project_sender: quit_tx.clone(),
+            }));
+        }
     }
 
-    project.run(gh_tracker, builder, quit_rx).await;
+    let maybe_error = project.run(gh_tracker, builder, quit_rx).await;
+    if maybe_error.unwrap_or(false) {
+        return Err("Found solutions or build failed!".to_string());
+    }
 
     Ok(())
 }

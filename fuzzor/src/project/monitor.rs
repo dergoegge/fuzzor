@@ -54,7 +54,7 @@ where
 
 #[derive(Clone)]
 pub struct QuittingBuildFailureMonitor {
-    pub quit_project_sender: Sender<()>,
+    pub quit_project_sender: Sender<bool>,
 }
 
 #[async_trait::async_trait]
@@ -62,7 +62,7 @@ impl ProjectMonitor for QuittingBuildFailureMonitor {
     async fn monitor_campaign_event(&mut self, _project: String, _event: CampaignEvent) {}
     async fn monitor_project_event(&mut self, _project: String, event: ProjectEvent) {
         if let ProjectEvent::BuildFailure = event {
-            let _ = self.quit_project_sender.try_send(());
+            let _ = self.quit_project_sender.try_send(true);
         }
     }
 }

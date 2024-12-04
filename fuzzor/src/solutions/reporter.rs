@@ -56,13 +56,13 @@ impl SolutionReporter for StdErrSolutionReporter {
 #[derive(Clone)]
 pub struct QuittingSolutionReporter<R> {
     inner: R,
-    quit_project_sender: Sender<()>,
+    quit_project_sender: Sender<bool>,
 }
 
 unsafe impl<R> Send for QuittingSolutionReporter<R> {}
 
 impl<R: SolutionReporter> QuittingSolutionReporter<R> {
-    pub fn new(inner: R, quit_project_sender: Sender<()>) -> Self {
+    pub fn new(inner: R, quit_project_sender: Sender<bool>) -> Self {
         Self {
             inner,
             quit_project_sender,
@@ -83,7 +83,7 @@ impl<R: SolutionReporter> SolutionReporter for QuittingSolutionReporter<R> {
             .report_new_solution(project, harness, solution)
             .await;
 
-        let _ = self.quit_project_sender.try_send(());
+        let _ = self.quit_project_sender.try_send(true);
 
         Ok(())
     }

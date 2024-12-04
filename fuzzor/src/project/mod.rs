@@ -290,7 +290,12 @@ where
         }
     }
 
-    pub async fn run<R, RT, B>(&mut self, revision_tracker: RT, builder: B, mut quit: Receiver<()>)
+    pub async fn run<R, RT, B, Q>(
+        &mut self,
+        revision_tracker: RT,
+        builder: B,
+        mut quit: Receiver<Q>,
+    ) -> Option<Q>
     where
         R: Revision + Clone + Send + 'static,
         RT: RevisionTracker<R> + Send + 'static,
@@ -349,13 +354,17 @@ where
         };
 
         // This is the main project loop. It handles new builds, new campaigns and campaign events.
+        let result;
         loop {
             tokio::select! {
                 Some(build) = build_rx.recv() => self.handle_build_result(build).await,
                 Some(campaign) = campaign_rx.recv() => self.handle_new_campaign(campaign).await,
                 Some(event) = campaign_event_rx.recv() => self.handle_campaign_event(event).await,
-                _ = quit.recv() => break,
-            };
+                q = quit.recv() => {
+                    result = q;
+                    break;
+                },
+            }
         }
 
         log::info!("Quiting project '{}'", self.config.name);
@@ -369,6 +378,8 @@ where
             let _ = quit.send(false).await;
             let _ = campaign_handle.await;
         }
+
+        return result;
     }
 }
 
