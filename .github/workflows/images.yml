@@ -18,7 +18,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build base fuzzor image
-        run: cd infra && docker buildx build --build-arg=FUZZOR_CI=1 --tag fuzzor-base:latest --file Dockerfile.base .
+        run: |
+          docker system prune --force
+          cd infra && docker buildx build --build-arg=FUZZOR_CI=1 --tag fuzzor-base:latest --file Dockerfile.base .
   build-bitcoin:
     needs: [build-base-image]
     runs-on: self-hosted
