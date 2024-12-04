@@ -376,7 +376,12 @@ where
         // Quit all active campaigns.
         for (_, (campaign_handle, quit)) in self.campaigns.drain() {
             let _ = quit.send(false).await;
-            let _ = campaign_handle.await;
+
+            if let Ok(Campaign { env, .. }) = campaign_handle.await {
+                self.env_allocator.free(env).await;
+            } else {
+                log::warn!("Couldn't free env for campaign!");
+            }
         }
 
         // Consume all remaining events
