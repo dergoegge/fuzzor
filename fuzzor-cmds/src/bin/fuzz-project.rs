@@ -46,6 +46,7 @@ impl ProjectMonitor for QuitAfterCampaignsMonitor {
                     let _ = self.quit_project_sender.try_send(false);
                 }
             }
+            CampaignEvent::Stats(harness, stats) => log::info!("'{}': {:?}", harness, stats),
             _ => {}
         }
     }
