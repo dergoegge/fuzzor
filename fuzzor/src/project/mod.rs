@@ -23,8 +23,13 @@ use scheduler::{CampaignScheduler, CampaignSchedulerInput};
 use state::State;
 
 use fuzzor_infra::ProjectConfig;
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::Mutex;
+use tokio::{
+    sync::{
+        mpsc::{Receiver, Sender},
+        Mutex,
+    },
+    time::{timeout, Duration},
+};
 
 #[derive(Debug)]
 pub enum ProjectEvent {
@@ -371,7 +376,8 @@ where
 
         // Quit the campaign scheduler task.
         self.wake_up_scheduler = None;
-        let _ = scheduler_task.await;
+        // Scheduler might be stuck waiting for an env, give it 10 seconds then just bail.
+        let _ = timeout(Duration::from_secs(10), scheduler_task).await;
 
         // Quit all active campaigns.
         for (_, (campaign_handle, quit)) in self.campaigns.drain() {
