@@ -18,6 +18,7 @@ RUN echo "unsigned-integer-overflow:secp256k1_*" >> ./ubsan_suppressions
 # the symbol based suppression doesn't seem to work.
 RUN echo "unsigned-integer-overflow:FuzzedDataProvider.h" >> ./ubsan_suppressions
 RUN echo "unsigned-integer-overflow:random.h" >> ./ubsan_suppressions
+RUN echo "unsigned-integer-overflow:util/bitset.h" >> ./ubsan_suppressions
 
 COPY ./config.yaml .
 COPY ./build.sh .
