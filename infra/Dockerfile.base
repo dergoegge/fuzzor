@@ -214,6 +214,11 @@ ENV AFL_HANG_TMOUT=60000
 
 ENV MSAN_LIBCXX_PATH=/libcxx_msan
 
+ENV LLVM_SYMBOLIZER_PATH="/usr/bin/llvm-symbolizer"
+ENV UBSAN_SYMBOLIZER_PATH="/usr/bin/llvm-symbolizer"
+ENV ASAN_SYMBOLIZER_PATH="/usr/bin/llvm-symbolizer"
+ENV MSAN_SYMBOLIZER_PATH="/usr/bin/llvm-symbolizer"
+
 RUN touch ubsan_suppressions
 ENV ASAN_OPTIONS="detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:abort_on_error=1:exitcode=75"
 ENV UBSAN_OPTIONS="suppressions=/workdir/ubsan_suppressions:print_stacktrace=1:halt_on_error=1:report_error_type=1:exitcode=76"
