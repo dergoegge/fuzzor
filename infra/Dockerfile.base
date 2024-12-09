@@ -172,7 +172,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
   rsync
 
 # Build & force mold usage
-RUN git clone https://github.com/rui314/mold.git --depth 1 --branch v2.34.1 && \
+RUN git clone https://github.com/rui314/mold.git --depth 1 --branch v2.35.0 && \
     cmake -G Ninja -B /mold/build -S mold -DCMAKE_BUILD_TYPE=Release && \
     ninja -C /mold/build/ "-j$(nproc)" install/strip && \
     rm -rf /mold && \
