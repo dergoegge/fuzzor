@@ -4,11 +4,6 @@ set -ex
 
 pushd bitcoin
 
-# This build script is executed repeatedly. Make sure there are no left over
-# build artifacts from previous executions.
-rm -rf build_fuzz
-make clean -C depends
-
 # Build dependencies using the Bitcoin Core depends system.
 sed -i --regexp-extended '/.*rm -rf .*extract_dir.*/d' ./depends/funcs.mk  # Keep extracted source
 make -C depends DEBUG=1 NO_QT=1 NO_BDB=1 NO_ZMQ=1 NO_USDT=1 \
@@ -49,5 +44,11 @@ readarray FUZZ_TARGETS < "/tmp/a"
 for fuzz_target in ${FUZZ_TARGETS[@]}; do
   touch "$OUT/$fuzz_target"
 done
+
+# This build script is executed repeatedly. Make sure there are no left over
+# build artifacts from previous executions, and that no build artifacts
+# are in the final image.
+rm -rf build_fuzz
+make clean -C depends
 
 popd
