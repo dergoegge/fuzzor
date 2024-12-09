@@ -48,3 +48,5 @@ support for adding and fuzzing other projects is available (see `projects/`).
 - [bitcoin: scriptpubkeyman: heap-buffer-overflow miniscript.cpp in CScript BuildScript](https://github.com/bitcoin/bitcoin/issues/30864)
 - [bitcoin: p2p_headers_presync: Assertion 'total_work < chainman.MinimumChainWork()' failed](https://github.com/bitcoin/bitcoin/pull/31213)
 - [bitcoin: connman: terminate called after throwing an instance of 'std::bad_alloc']()
+- [bitcoin #31244: various descriptor parsing crashes](https://github.com/bitcoin/bitcoin/pull/31244#issuecomment-2527475671)
+- [bitcoin #28584: null-ptr deref](https://github.com/bitcoin/bitcoin/pull/28584#issuecomment-2527495228)
