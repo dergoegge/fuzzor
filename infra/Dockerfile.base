@@ -18,7 +18,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   ninja-build \
   python3
 
-RUN git clone --depth 1 --branch "llvmorg-19.1.5" https://github.com/llvm/llvm-project.git
+RUN git clone --depth 1 --branch "llvmorg-19.1.6" https://github.com/llvm/llvm-project.git
 
 # Build clang and runtimes
 RUN --mount=type=cache,target=/ccache/ \
