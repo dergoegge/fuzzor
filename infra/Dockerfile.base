@@ -188,7 +188,8 @@ RUN git clone --branch stable https://github.com/AFLplusplus/AFLplusplus && \
                         LLVM_CONFIG=llvm-config \
                         # actually mold
                         AFL_REAL_LD=/usr/bin/ld \
-                        install -j$(nproc) && \
+                        -j$(nproc) && \
+    make -C AFLplusplus install && \
     rm -rf AFLplusplus
 
 # Install FlameGraph
