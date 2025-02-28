@@ -72,6 +72,7 @@ fn setup_aflpp_instances(
             fuzzers.len() as u64,
             extra_args.clone(),
             HashMap::new(),
+            options.aflpp_nyx,
         ))));
 
         if let Some(cmplog_bin) = options.aflpp_cmplog_binary.as_ref() {
@@ -86,6 +87,7 @@ fn setup_aflpp_instances(
                 fuzzers.len() as u64,
                 args,
                 HashMap::new(),
+                options.aflpp_nyx,
             ))));
         }
 
@@ -104,6 +106,7 @@ fn setup_aflpp_instances(
                     fuzzers.len() as u64,
                     extra_args.clone(),
                     HashMap::new(),
+                    options.aflpp_nyx,
                 ))));
             }
         }
@@ -122,6 +125,7 @@ fn setup_aflpp_instances(
                     fuzzers.len() as u64,
                     args.to_vec(),
                     envs[i].clone(),
+                    options.aflpp_nyx,
                 ))));
             }
         }

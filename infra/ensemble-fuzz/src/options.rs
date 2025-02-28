@@ -20,6 +20,12 @@ pub struct EnsembleOptions {
         default_value_t = false
     )]
     pub aflpp_occupy: bool,
+    #[arg(
+        long = "aflpp-nyx",
+        help = "Enable nyx mode for afl++",
+        default_value_t = false
+    )]
+    pub aflpp_nyx: bool,
 
     /// LibFuzzer options
     #[arg(long = "libfuzzer-binary", help = "Specify a libFuzzer binary")]

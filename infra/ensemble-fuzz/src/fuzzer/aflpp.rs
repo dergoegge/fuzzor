@@ -20,7 +20,7 @@ pub struct AflppFuzzer {
     pub id: u64,
     pub args: Vec<String>,
     pub env: HashMap<String, String>,
-
+    pub nyx: bool,
     out_dir: PathBuf,
     pull_corpus: PathBuf,
 }
@@ -33,6 +33,7 @@ impl AflppFuzzer {
         id: u64,
         args: Vec<String>,
         env: HashMap<String, String>,
+        nyx: bool,
     ) -> Self {
         Self {
             seeds,
@@ -41,6 +42,7 @@ impl AflppFuzzer {
             id,
             args,
             env,
+            nyx,
             out_dir: PathBuf::new(),
             pull_corpus: PathBuf::new(),
         }
@@ -158,6 +160,10 @@ impl Fuzzer for AflppFuzzer {
         // Specify afl++'s output dir
         args.push("-o");
         args.push(self.out_dir.to_str().unwrap());
+
+        if self.nyx {
+            args.push("-Y");
+        }
 
         // Specify instance type (main/secondary) and name
         let id_str = self.id.to_string();
