@@ -210,7 +210,9 @@ async fn main() -> Result<(), std::io::Error> {
     let config: ProjectConfig =
         serde_yaml::from_str(&fs::read_to_string(&opts.config).await?).unwrap();
     let harness_config = serde_yaml::from_str(
-        &fs::read_to_string(&PathBuf::from(format!("/{}.options.yaml", opts.harness))).await?,
+        &fs::read_to_string(&PathBuf::from(format!("/{}.options.yaml", opts.harness)))
+            .await
+            .unwrap_or("".to_string()),
     )
     .unwrap_or(HarnessConfig::default());
 
