@@ -1,11 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use super::harness::*;
-use crate::env::*;
-use crate::solutions::*;
+use crate::{env::*, project::harness::*, solutions::*};
 
-use fuzzor_infra::FuzzerStats;
+use fuzzor_infra::{FuzzerStats, ProjectConfig};
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     Mutex,
@@ -51,7 +49,7 @@ pub struct Campaign<E> {
     // Last stats reported by the environment
     last_reported_stats: Option<FuzzerStats>,
     // Name of the project managing this campaign
-    project_name: String,
+    project_config: ProjectConfig,
 }
 
 impl<E> Campaign<E>
@@ -59,7 +57,7 @@ where
     E: Environment,
 {
     pub async fn new(
-        project_name: String,
+        project_config: ProjectConfig,
         harness: Arc<Mutex<Harness>>,
         env: E,
         event_sender: Sender<CampaignEvent>,
@@ -68,7 +66,7 @@ where
 
         log::info!(
             "New campaign: project='{}' harness='{}' env='{}'",
-            &project_name,
+            &project_config.name,
             &harness_name,
             &env.get_id().await[..8],
         );
@@ -80,7 +78,7 @@ where
             state: CampaignState::Scheduled,
             event_sender,
             last_reported_stats: None,
-            project_name,
+            project_config,
         }
     }
 
@@ -204,7 +202,7 @@ where
                         "{} hangs did not reproduce (harness={}, project={})",
                         stats.saved_hangs - reproduced_hangs,
                         self.harness_name,
-                        self.project_name
+                        self.project_config.name
                     );
                 }
 
@@ -218,7 +216,7 @@ where
                         "{} crashes did not reproduce (harness={}, project={})",
                         stats.saved_crashes - reproduced_crashes,
                         self.harness_name,
-                        self.project_name
+                        self.project_config.name
                     );
 
                     end = true;
@@ -261,7 +259,7 @@ where
                         log::info!(
                             "Existing solution ({}) still reproduces (project='{}', harness='{}')",
                             solution_id,
-                            self.project_name,
+                            self.project_config.name,
                             self.harness_name,
                         );
 
@@ -270,7 +268,7 @@ where
                         log::info!(
                             "Existing solution ({}) no longer reproduces (project='{}', harness='{}')",
                             solution_id,
-                            self.project_name,
+                            self.project_config.name,
                             self.harness_name,
                         );
 
@@ -384,7 +382,7 @@ where
 
         log::info!(
             "Campaign ended: project='{}' harness='{}' env='{}'",
-            self.project_name,
+            self.project_config.name,
             self.harness_name,
             &self.env.get_id().await[..8]
         );

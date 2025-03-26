@@ -588,9 +588,9 @@ where
             // Create quit channel for the new campaign.
             let (quit_tx, quit_rx) = tokio::sync::mpsc::channel(16);
             // Run the campaign in a separate task.
-            let project_name = self.project_config.name.clone();
+            let project_config = self.project_config.clone();
             let campaign_task = tokio::spawn(async move {
-                let mut campaign = Campaign::new(project_name, harness, env, event_sender).await;
+                let mut campaign = Campaign::new(project_config, harness, env, event_sender).await;
                 campaign.run(quit_rx).await;
                 campaign
             });
