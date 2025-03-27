@@ -258,3 +258,38 @@ pub fn get_harness_binary(
 
     harness_dir.map(|dir| PathBuf::from(format!("/workdir/out/{}/{}", dir, binary_name)))
 }
+
+pub enum AflTool {
+    AflFuzz,
+    AflCMin,
+    AflPlot,
+    AflWhatsUp,
+    AflTmin,
+    AflAddSeeds,
+    AflShowMap,
+}
+
+impl std::fmt::Display for AflTool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AflTool::AflFuzz => write!(f, "afl-fuzz"),
+            AflTool::AflCMin => write!(f, "afl-cmin"),
+            AflTool::AflPlot => write!(f, "afl-plot"),
+            AflTool::AflWhatsUp => write!(f, "afl-whatsup"),
+            AflTool::AflTmin => write!(f, "afl-tmin"),
+            AflTool::AflAddSeeds => write!(f, "afl-addseeds"),
+            AflTool::AflShowMap => write!(f, "afl-showmap"),
+        }
+    }
+}
+
+pub fn get_afl_tool_path(tool: AflTool) -> String {
+    match std::env::var("FUZZOR_AFLPP_BIN_PATH") {
+        Ok(path) => PathBuf::from(path)
+            .join(tool.to_string())
+            .to_str()
+            .unwrap()
+            .to_string(),
+        Err(_) => tool.to_string(),
+    }
+}

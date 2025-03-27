@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use fuzzor_infra::{get_harness_binary, FuzzEngine, ProjectConfig, Sanitizer};
+use fuzzor_infra::{
+    get_afl_tool_path, get_harness_binary, AflTool, FuzzEngine, ProjectConfig, Sanitizer,
+};
 use tokio::{fs, process::Command};
 
 #[derive(Parser, Debug)]
@@ -67,7 +69,7 @@ async fn minimize_with_afl(
             std::io::Error::new(std::io::ErrorKind::NotFound, "Harness binary not found")
         })?;
 
-    Command::new("afl-cmin")
+    Command::new(get_afl_tool_path(AflTool::AflCMin))
         .args([
             "-A",
             "-i",

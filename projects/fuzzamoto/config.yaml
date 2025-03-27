@@ -1,0 +1,15 @@
+name: fuzzamoto
+
+owner: bitcoin
+repo: bitcoin
+
+# Fuzzamoto is written in Rust but Bitcoin Core is written in C++
+language: Cpp
+ccs:
+- dergoegge
+
+engines:
+- AflPlusPlusNyx
+sanitizers:
+- Address # All cores are fuzzing with ASan
+- None    # For reproduction purposes only

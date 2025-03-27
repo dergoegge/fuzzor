@@ -118,6 +118,12 @@ impl FuzzerConfiguration {
     }
 
     fn configure_aflplusplus(&mut self) {
+        if self.try_add_fuzzer(FuzzEngine::AflPlusPlusNyx, Sanitizer::Address) {
+            self.extra_args.push("--aflpp-nyx".to_string());
+            self.extra_args.push("--aflpp-occupy".to_string());
+            return;
+        }
+
         if !self.try_add_fuzzer(FuzzEngine::AflPlusPlus, Sanitizer::None) {
             return;
         }
@@ -132,10 +138,6 @@ impl FuzzerConfiguration {
         }
 
         self.extra_args.push("--aflpp-occupy".to_string());
-
-        if self.config.has_engine(&FuzzEngine::AflPlusPlusNyx) {
-            self.extra_args.push("--aflpp-nyx".to_string());
-        }
     }
 
     fn build_command(&self, opts: &Options) -> tokio::process::Command {
@@ -179,6 +181,9 @@ fn add_fuzzer(
 ) {
     let sanitizer_str = match sanitizer {
         Sanitizer::None | Sanitizer::Coverage | Sanitizer::ValueProfile => None,
+        // `--aflpp-binary` is set to the sharedir of the nyx address sanitizer
+        // build.
+        Sanitizer::Address if config.has_engine(&FuzzEngine::AflPlusPlusNyx) => None,
         Sanitizer::Address => Some("asan"),
         Sanitizer::Undefined => Some("ubsan"),
         Sanitizer::Memory => Some("msan"),

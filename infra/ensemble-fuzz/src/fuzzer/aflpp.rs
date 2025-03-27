@@ -6,7 +6,7 @@ use std::process::Stdio;
 use crate::options::EnsembleOptions;
 
 use async_trait::async_trait;
-use fuzzor_infra::FuzzerStats;
+use fuzzor_infra::{get_afl_tool_path, AflTool, FuzzerStats};
 use rand::Rng;
 
 use super::Fuzzer;
@@ -187,7 +187,7 @@ impl Fuzzer for AflppFuzzer {
         args.push("--");
         args.push(self.binary.to_str().unwrap());
 
-        let mut command = tokio::process::Command::new("afl-fuzz");
+        let mut command = tokio::process::Command::new(get_afl_tool_path(AflTool::AflFuzz));
         command.args(&args);
 
         self.env

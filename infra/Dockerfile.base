@@ -158,8 +158,7 @@ RUN git clone --branch stable https://github.com/AFLplusplus/AFLplusplus && \
                         # actually mold
                         AFL_REAL_LD=/usr/bin/ld \
                         -j$(nproc) && \
-    make -C AFLplusplus install && \
-    rm -rf AFLplusplus
+    make -C AFLplusplus install
 
 # Install FlameGraph
 RUN git clone --depth 1 https://github.com/brendangregg/FlameGraph
