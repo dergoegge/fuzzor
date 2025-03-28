@@ -70,6 +70,22 @@ async fn upload_file_to_repo(
         .content)
 }
 
+fn truncate_stack_trace(stack_trace: &str, max_size: usize) -> &str {
+    // If stack trace is already smaller than max_size, return it as-is
+    if stack_trace.len() <= max_size {
+        return stack_trace;
+    }
+
+    // Take the last max_size bytes
+    let truncated = &stack_trace[stack_trace.len() - max_size..];
+
+    // Find the first newline and skip everything before it (including the newline)
+    match truncated.find('\n') {
+        Some(pos) => &truncated[pos + 1..],
+        None => truncated, // In case there are no newlines
+    }
+}
+
 #[async_trait]
 impl SolutionReporter for GitHubRepoSolutionReporter {
     async fn report_new_solution(
@@ -153,10 +169,10 @@ impl SolutionReporter for GitHubRepoSolutionReporter {
             Differential(_) => String::from("Differential"),
         };
 
-        // We include the base64 encoded input in the issue but only if it is less than 10KB.
+        // We include the base64 encoded input in the issue but only if it is less than 5KiB.
         let base64 = solution.input_base64();
-        let base64 = if base64.len() > 10000 {
-            String::from("Base64 encoded input exceeds 10KB")
+        let base64 = if base64.len() > (5 * 1024) {
+            String::from("Base64 encoded input exceeds 5KiB")
         } else {
             base64
         };
@@ -168,7 +184,7 @@ impl SolutionReporter for GitHubRepoSolutionReporter {
             .body(match solution.metadata() {
                 Crash(stack_trace) | Differential(stack_trace) => format!(
                     "Deduplication key: {}\n\nTest case: {}\nBase64: \n```\n{}\n```\n\nStacktrace:\n ```\n{}```\n",
-                    solution.id(), input_url, base64, stack_trace
+                    solution.id(), input_url, base64, truncate_stack_trace(stack_trace, 4096),
                 ),
                 Timeout(_) => format!(
                     "Deduplication key: {}\n\nTest case: {}\nBase64: \n```\n{}\n```\n\nFlame Graph: {}\n",
