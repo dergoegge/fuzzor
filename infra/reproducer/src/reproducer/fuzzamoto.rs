@@ -88,11 +88,19 @@ impl Reproducer<FuzzamotoReproducerError> for FuzzamotoReproducer {
         let (stdout, stderr) = create_cloned_files(&output_path)
             .map_err(|_| FuzzamotoReproducerError::FailedToCreateOutputFile)?;
 
+        let asan_options = std::env::var("ASAN_OPTIONS").unwrap_or_default();
+        let asan_options = format!(
+            "{}:symbolize=1:abort_on_error=1:handle_abort=1",
+            asan_options
+        );
+
         let mut child = tokio::process::Command::new(&scenario)
             .arg(&bitcoind)
             .stdin(std::process::Stdio::piped())
             .stdout(stdout)
             .stderr(stderr)
+            .env("RUST_LOG", "debug")
+            .env("ASAN_OPTIONS", asan_options)
             .kill_on_drop(true)
             .spawn()
             .map_err(|_| FuzzamotoReproducerError::FailedToSpawnScenarioCommand)?;
