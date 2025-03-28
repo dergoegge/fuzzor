@@ -8,6 +8,7 @@ use fuzzor::{
     },
     revisions::Revision,
 };
+use fuzzor_infra::{FuzzEngine, ProjectConfig, Sanitizer};
 
 use futures_util::StreamExt;
 
@@ -41,6 +42,7 @@ impl DockerBuilder {
 /// This is achieved by creating a container and listing all entries in the harness directory.
 async fn get_harness_set(
     docker: &bollard::Docker,
+    project_config: &ProjectConfig,
     image_id: &str,
 ) -> Result<HashSet<String>, String> {
     let config = bollard::container::Config {
@@ -61,12 +63,24 @@ async fn get_harness_set(
         .await
         .map_err(|e| format!("Could not create exec in container: {}", e))?;
 
+    let engines_and_sanitizers = [
+        (FuzzEngine::LibFuzzer, Sanitizer::None),
+        (FuzzEngine::AflPlusPlus, Sanitizer::None),
+    ];
+
+    let harness_dir = engines_and_sanitizers
+        .iter()
+        .find_map(|(engine, sanitizer)| {
+            fuzzor_infra::get_harness_dir(engine, sanitizer, project_config)
+        })
+        .ok_or_else(|| String::from("Could not find harness directory"))?;
+
     let exec = docker
         .create_exec(
             &id,
             bollard::exec::CreateExecOptions {
                 attach_stdout: Some(true),
-                cmd: Some(vec!["ls", "/workdir/out/libfuzzer"]),
+                cmd: Some(vec!["ls", &format!("/workdir/out/{}", harness_dir)]),
                 ..Default::default()
             },
         )
@@ -232,7 +246,7 @@ where
             &image_id
         );
 
-        let mut harnesses = get_harness_set(&docker, &image_id).await?;
+        let mut harnesses = get_harness_set(&docker, &config, &image_id).await?;
 
         if config.fuzz_env_var.is_some() {
             harnesses.remove("fuzz");
