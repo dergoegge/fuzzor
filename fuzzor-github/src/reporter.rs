@@ -198,7 +198,7 @@ impl SolutionReporter for GitHubRepoSolutionReporter {
             .assignees(self.ccs.clone())
             .send()
             .await
-            .map_err(|e| format!("Could not create issue for new solution: {}", e))?
+            .map_err(|e| format!("Could not create issue for new solution: {:?}", e))?
             .number;
 
         log::info!(

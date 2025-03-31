@@ -66,7 +66,10 @@ impl FuzzamotoReproducer {
 }
 
 impl FuzzamotoReproducer {
-    async fn inner_reproduce(&self) -> Result<ReproducedSolution, FuzzamotoReproducerError> {
+    async fn inner_reproduce(
+        &self,
+        last_exec: bool,
+    ) -> Result<ReproducedSolution, FuzzamotoReproducerError> {
         let workdir =
             tempfile::tempdir().map_err(|_| FuzzamotoReproducerError::FailedToCreateWorkdir)?;
 
@@ -118,6 +121,14 @@ impl FuzzamotoReproducer {
             .await
             .map_err(|_| FuzzamotoReproducerError::FailedToWaitOnScenarioCommand)?;
 
+        if !last_exec {
+            if let Some(101) = status.code() {
+                // Ignore rust panics in the scenario itself, unless this is the last time we
+                // attempt to reproduce.
+                return Err(FuzzamotoReproducerError::SolutionNotReproducible);
+            }
+        }
+
         if status.success() {
             return Err(FuzzamotoReproducerError::SolutionNotReproducible);
         }
@@ -140,8 +151,8 @@ impl Reproducer<FuzzamotoReproducerError> for FuzzamotoReproducer {
         const MAX_RETRIES: usize = 5;
 
         let mut last_error = None;
-        for _ in 0..MAX_RETRIES {
-            match self.inner_reproduce().await {
+        for attempt in 0..MAX_RETRIES {
+            match self.inner_reproduce(attempt == MAX_RETRIES - 1).await {
                 Ok(solution) => return Ok(solution),
                 Err(e) => last_error = Some(e),
             }
