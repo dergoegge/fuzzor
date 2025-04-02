@@ -76,7 +76,7 @@ impl DockerEnv {
             log::info!("Pulling image='{}' on machine {:?}", from_image, machine);
             let options = Some(bollard::image::CreateImageOptions {
                 from_image: from_image.as_str(),
-                tag: "latest",
+                tag: params.commit.as_str(),
                 ..Default::default()
             });
 
@@ -89,15 +89,22 @@ impl DockerEnv {
                 }
             }
 
+            // Tag the pulled image for local use as "fuzzor-<prj name>:latest"
             let tag_options = bollard::image::TagImageOptions {
                 repo: params.docker_image.as_str(),
                 tag: "latest",
             };
+            let _ = docker
+                .tag_image(
+                    &format!("{}:{}", from_image, params.commit),
+                    Some(tag_options),
+                )
+                .await;
 
-            docker
-                .tag_image(&from_image, Some(tag_options))
-                .await
-                .unwrap();
+            // Untag the pulled image, it still exists as "fuzzor-<prj name>:latest"
+            let _ = docker
+                .remove_image(&format!("{}:{}", from_image, params.commit), None, None)
+                .await;
         }
 
         let mut resource_limits = Vec::new();
@@ -548,7 +555,37 @@ impl EnvironmentAllocator<DockerEnv> for DockerEnvAllocator {
 
     async fn free(&mut self, mut env: DockerEnv) -> bool {
         env.shutdown().await;
+
+        if let Ok(docker) = bollard::Docker::connect_with_http(
+            &env.machine.daemon_addr,
+            120,
+            &bollard::ClientVersion {
+                minor_version: 1,
+                major_version: 44,
+            },
+        ) {
+            // Prune unused and untagged images
+            let mut filters = HashMap::new();
+            filters.insert("dangling", vec!["1"]);
+            match docker
+                .prune_images(Some(bollard::image::PruneImagesOptions { filters }))
+                .await
+            {
+                Ok(prune_result) => {
+                    log::info!(
+                        "Pruned {} images and reclaimed {} GiB of disk space!",
+                        prune_result.images_deleted.map_or(0, |imgs| imgs.len()),
+                        prune_result.space_reclaimed.unwrap_or(0) / (1024 * 1024 * 1024),
+                    );
+                }
+                Err(e) => {
+                    log::warn!("Could not prune dangling images: {:?}", e);
+                }
+            };
+        }
+
         self.machines.add_one(env.machine).await;
+
         true
     }
 }

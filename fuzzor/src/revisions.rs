@@ -9,6 +9,12 @@ pub trait Revision {
     fn commit_hash(&self) -> &str;
     /// List of files that were changed between this revision and the previous one.
     fn modified_files(&self) -> &[String];
+
+    fn new(
+        commit_hash: String,
+        previous_commit_hash: Option<String>,
+        modified_files: Vec<String>,
+    ) -> Self;
 }
 
 #[async_trait::async_trait]

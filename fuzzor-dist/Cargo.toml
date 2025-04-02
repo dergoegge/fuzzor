@@ -1,0 +1,36 @@
+[package]
+name = "fuzzor-dist"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+fuzzor_infra = { path = "../infra/types", package = "types", version = "0.1.0" }
+fuzzor = { path = "../fuzzor", version = "0.1.0" }
+fuzzor-docker = { path = "../fuzzor-docker", version = "0.1.0" }
+fuzzor-github = { path = "../fuzzor-github", version = "0.1.0" }
+fuzzor-prometheus = { path = "../fuzzor-prometheus", version = "0.1.0" }
+
+async-trait = "0.1.80"
+serde = { version = "1.0.197", features = ["derive"] }
+tokio = { version = "1.37", features = ["full"] }
+axum = "0.8.3"
+log = "0.4.27"
+env_logger = "0.11.3"
+clap = { version = "4.5.4", features = ["derive", "string"] }
+reqwest = { version = "0.11", features = ["json"] }
+hostname = "0.4.0"
+num_cpus = "1.16.0"
+async-nats = "0.40.0"
+futures = "0.3.31"
+serde_json = "1.0.140"
+rand = "0.9.0"
+hex = "0.4.3"
+homedir = "0.2.1"
+tar = "0.4.44"
+
+[[bin]]
+name = "fuzzor"
+path = "bin/fuzzor.rs"

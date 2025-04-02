@@ -11,11 +11,11 @@ engines:
 - LibFuzzer
 - AflPlusPlus
 - None
-- SemSan
+#- SemSan
 sanitizers:
 - Address
 - Undefined
 - CmpLog
 - None
-- !SemSan ClangO0
-- !SemSan GccO0
+#- !SemSan ClangO0
+#- !SemSan GccO0

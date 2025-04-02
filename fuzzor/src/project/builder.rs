@@ -1,19 +1,25 @@
 use std::collections::HashSet;
-use std::future::Future;
 
 use super::description::ProjectDescription;
 use crate::revisions::Revision;
 
+#[derive(Debug, Clone)]
+pub enum ProjectBuildFailure {
+    Build { log: std::path::PathBuf },
+    Other { msg: String },
+}
+
+#[async_trait::async_trait]
 pub trait ProjectBuilder<R, D>
 where
     R: Revision,
     D: ProjectDescription,
 {
-    fn build(
+    async fn build(
         &mut self,
         description: D,
         revision: R,
-    ) -> impl Future<Output = Result<ProjectBuild<R>, String>> + Send;
+    ) -> Result<ProjectBuild<R>, ProjectBuildFailure>;
 }
 
 #[derive(Debug)]

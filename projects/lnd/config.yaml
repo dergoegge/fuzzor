@@ -11,3 +11,5 @@ engines:
 - NativeGo
 sanitizers:
 - None
+
+architecture: Arm64

@@ -8,10 +8,9 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
     Mutex,
 };
-use tokio::task::JoinHandle;
 
 /// Possible states of a campaign
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum CampaignState {
     /// Campaign has been scheduled but has not started fuzzing yet
     Scheduled,
@@ -21,7 +20,7 @@ pub enum CampaignState {
     Ended,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum CampaignEvent {
     Initialized(String),
     /// NewState fires when a campaign changes state
@@ -340,6 +339,12 @@ where
     }
 
     async fn process_stats(&mut self, stats: FuzzerStats) {
+        log::debug!(
+            "Campaign stats for harness='{}': {:?}",
+            self.harness_name,
+            stats
+        );
+
         if self.state == CampaignState::Scheduled && stats.execs_per_sec > 0.0 {
             self.new_state(CampaignState::Fuzzing).await;
         }

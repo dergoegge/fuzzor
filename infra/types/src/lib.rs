@@ -5,8 +5,9 @@ use serde::{Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as};
 use sha2::{Digest, Sha256};
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Language {
+    #[default]
     C,
     Cpp,
     Rust,
@@ -65,13 +66,39 @@ pub enum SemSanBuild {
     Custom15,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum CpuType {
+    Emulated,
+    Virtual,
+    BareMetal,
+}
+
+impl std::fmt::Display for CpuType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CpuType::Emulated => write!(f, "emulated"),
+            CpuType::Virtual => write!(f, "virtual"),
+            CpuType::BareMetal => write!(f, "bare metal"),
+        }
+    }
+}
+
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum CpuArchitecture {
-    Amd64,
+    X86_64,
     Arm64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+impl std::fmt::Display for CpuArchitecture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CpuArchitecture::X86_64 => write!(f, "x86_64"),
+            CpuArchitecture::Arm64 => write!(f, "arm64"),
+        }
+    }
+}
+
+#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ProjectConfig {
     pub name: String,
     pub owner: String,
@@ -81,8 +108,10 @@ pub struct ProjectConfig {
     pub ccs: Vec<String>,
     pub engines: Option<Vec<FuzzEngine>>,
     pub sanitizers: Option<Vec<Sanitizer>>,
-    pub architectures: Option<Vec<CpuArchitecture>>,
+    pub architecture: Option<CpuArchitecture>,
     pub fuzz_env_var: Option<String>,
+    pub cpu_hours_per_campaign: Option<u64>,
+    pub report_repo: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
@@ -166,10 +195,6 @@ impl ReproducedSolution {
             .as_secs();
         format!("fuzzor-{}-{:?}-{:x}", time, self.cause, input_hash)
     }
-}
-
-pub fn format_image_name(config: &ProjectConfig) -> String {
-    format!("fuzzor-{}", &config.name)
 }
 
 pub fn get_harness_dir(

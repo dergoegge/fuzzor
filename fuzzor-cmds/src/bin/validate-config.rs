@@ -12,7 +12,10 @@ fn main() {
     let opts = Options::parse();
 
     let config = std::fs::read_to_string(opts.config).unwrap();
-    match serde_yaml::from_str(&config).unwrap() {
+    let config = serde_yaml::from_str(&config).unwrap();
+    println!("{:#?}", config);
+
+    match config {
         ProjectConfig {
             language: Language::Go,
             engines: Some(engines),

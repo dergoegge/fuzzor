@@ -1,9 +1,9 @@
 [workspace]
 members = [
     "fuzzor",
-    "fuzzor-cmds",
+    "fuzzor-cmds", "fuzzor-dist",
     "fuzzor-docker",
-    "fuzzor-github",
+    "fuzzor-github", "fuzzor-prometheus",
     "infra/builder",
     "infra/coverage-reporter",
     "infra/ensemble-fuzz",

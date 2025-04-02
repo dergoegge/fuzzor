@@ -4,6 +4,7 @@ use std::time::Duration;
 use super::harness::*;
 use super::ProjectConfig;
 use crate::env::*;
+use crate::revisions::Revision;
 
 use rand::{seq::SliceRandom, thread_rng};
 
@@ -15,9 +16,12 @@ pub struct CampaignSchedulerInput {
 
 /// CampaignScheduler defines how fuzzing campaigns are scheduled.
 #[async_trait::async_trait]
-pub trait CampaignScheduler {
+pub trait CampaignScheduler<R>
+where
+    R: Revision + Send + Clone + 'static,
+{
     /// Get the next harness from the schedule
-    async fn next(&mut self) -> Result<EnvironmentParams, &'static str>;
+    async fn next(&mut self, rev: R) -> Result<EnvironmentParams, &'static str>;
     /// Mark the campaign for harness as finished
     fn finish(&mut self, harness: &str) -> Result<(), &'static str>;
     /// Sync the shared harness list with the campaign schedule
@@ -55,8 +59,11 @@ impl RoundRobinCampaignScheduler {
 }
 
 #[async_trait::async_trait]
-impl CampaignScheduler for RoundRobinCampaignScheduler {
-    async fn next(&mut self) -> Result<EnvironmentParams, &'static str> {
+impl<R> CampaignScheduler<R> for RoundRobinCampaignScheduler
+where
+    R: Revision + Send + Clone + 'static,
+{
+    async fn next(&mut self, rev: R) -> Result<EnvironmentParams, &'static str> {
         if self.current_schedule.is_empty() {
             return Err("Nothing in the current schedule");
         }
@@ -64,13 +71,18 @@ impl CampaignScheduler for RoundRobinCampaignScheduler {
         let harness_name = self.current_schedule[self.next_harness].clone();
 
         if !self.unfinished.insert(harness_name.clone()) {
+            log::debug!(
+                "Attempted to reschedule unfinished campaign: {}",
+                harness_name
+            );
             return Err("Attempted to reschedule unfinished campaign");
         }
 
         self.next_harness = (self.next_harness + 1) % self.current_schedule.len();
         Ok(EnvironmentParams {
-            docker_image: format!("fuzzor-{}:latest", self.project_config.name),
-            arch: None,
+            docker_image: format!("fuzzor-{}", self.project_config.name),
+            commit: rev.commit_hash().to_string(),
+            arch: self.project_config.architecture.clone(),
             harness_name,
             duration: self.duration,
             project_config: self.project_config.clone(),
@@ -150,19 +162,23 @@ impl CoverageBasedScheduler {
 }
 
 #[async_trait::async_trait]
-impl CampaignScheduler for CoverageBasedScheduler {
-    async fn next(&mut self) -> Result<EnvironmentParams, &'static str> {
+impl<R> CampaignScheduler<R> for CoverageBasedScheduler
+where
+    R: Revision + Send + Clone + 'static,
+{
+    async fn next(&mut self, rev: R) -> Result<EnvironmentParams, &'static str> {
         match self.schedule.pop_front() {
             Some(harness_name) => Ok(EnvironmentParams {
-                docker_image: format!("fuzzor-{}:latest", self.project_config.name),
-                arch: None,
+                docker_image: format!("fuzzor-{}", self.project_config.name),
+                commit: rev.commit_hash().to_string(),
+                arch: self.project_config.architecture.clone(),
                 harness_name,
                 duration: self.duration,
                 project_config: self.project_config.clone(),
             }),
             None => {
                 if let Some(rr) = self.rr_scheduler.as_mut() {
-                    rr.next().await
+                    rr.next(rev).await
                 } else {
                     Err("Nothing in current schedule")
                 }
@@ -172,7 +188,8 @@ impl CampaignScheduler for CoverageBasedScheduler {
 
     async fn sync_schedule(&mut self, input: CampaignSchedulerInput) {
         if let Some(rr) = self.rr_scheduler.as_mut() {
-            rr.sync_schedule(input.clone()).await;
+            <RoundRobinCampaignScheduler as CampaignScheduler<R>>::sync_schedule(rr, input.clone())
+                .await;
         }
 
         if let Some(base_harnesses) = &self.base_harnesses {
@@ -259,7 +276,7 @@ impl CampaignScheduler for CoverageBasedScheduler {
 
     fn finish(&mut self, harness: &str) -> Result<(), &'static str> {
         if let Some(rr) = self.rr_scheduler.as_mut() {
-            let _ = rr.finish(harness);
+            let _ = <RoundRobinCampaignScheduler as CampaignScheduler<R>>::finish(rr, harness);
         }
 
         Ok(())
@@ -287,12 +304,16 @@ impl OneShotScheduler {
 }
 
 #[async_trait::async_trait]
-impl CampaignScheduler for OneShotScheduler {
-    async fn next(&mut self) -> Result<EnvironmentParams, &'static str> {
+impl<R> CampaignScheduler<R> for OneShotScheduler
+where
+    R: Revision + Send + Clone + 'static,
+{
+    async fn next(&mut self, rev: R) -> Result<EnvironmentParams, &'static str> {
         match self.schedule.pop_front() {
             Some(harness_name) => Ok(EnvironmentParams {
-                docker_image: format!("fuzzor-{}:latest", self.project_config.name),
-                arch: None,
+                docker_image: format!("fuzzor-{}", self.project_config.name,),
+                commit: rev.commit_hash().to_string(),
+                arch: self.project_config.architecture.clone(),
                 harness_name,
                 duration: self.duration,
                 project_config: self.project_config.clone(),

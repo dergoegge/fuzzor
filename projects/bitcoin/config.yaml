@@ -21,4 +21,9 @@ sanitizers:
 - ValueProfile
 - None
 
+architecture: X86_64
+
 fuzz_env_var: FUZZ
+
+cpu_hours_per_campaign: 48
+report_repo: "dergoegge/fuzzor-reports"

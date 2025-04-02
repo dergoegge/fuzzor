@@ -36,10 +36,11 @@ pub trait Environment {
     async fn ping(&self) -> Result<bool, String>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct EnvironmentParams {
     /// Docker image to use for the environment
     pub docker_image: String,
+    pub commit: String,
     /// Requested architecture for the environment
     pub arch: Option<CpuArchitecture>,
     /// Name of the harness to be fuzzed

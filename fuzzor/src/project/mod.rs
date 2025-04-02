@@ -14,7 +14,7 @@ use crate::{
     env::{Environment, EnvironmentAllocator},
     revisions::{Revision, RevisionTracker},
 };
-use builder::{ProjectBuild, ProjectBuilder};
+use builder::{ProjectBuild, ProjectBuildFailure, ProjectBuilder};
 use campaign::{Campaign, CampaignEvent};
 use description::ProjectDescription;
 use harness::{Harness, PersistentHarnessState, SharedHarnessMap};
@@ -46,7 +46,7 @@ pub struct ProjectOptions {
     pub no_fuzzing: bool,
 }
 
-pub struct Project<E, D, EA, CH, S, C>
+pub struct Project<E, D, EA, CH, S, C, R>
 where
     E: Environment,
     CH: CorpusHerder<Vec<u8>> + Send,
@@ -61,7 +61,7 @@ where
 
     state: S,
 
-    scheduler: Arc<Mutex<Box<dyn CampaignScheduler + Send>>>,
+    scheduler: Arc<Mutex<Box<dyn CampaignScheduler<R> + Send>>>,
     env_allocator: EA,
     wake_up_scheduler: Option<Sender<()>>,
 
@@ -74,7 +74,7 @@ where
     phantom: std::marker::PhantomData<(CH, E)>,
 }
 
-impl<E, D, EA, CH, S, C> Project<E, D, EA, CH, S, C>
+impl<E, D, EA, CH, S, C, R> Project<E, D, EA, CH, S, C, R>
 where
     E: Environment + Send + 'static,
     D: ProjectDescription + Clone + Send + 'static,
@@ -82,11 +82,12 @@ where
     CH: CorpusHerder<Vec<u8>> + Send + 'static,
     S: State<CH, PersistentHarnessState>,
     C: Campaign<E> + Send + 'static,
+    R: Revision + Send + Clone + 'static,
 {
     pub fn new(
         description: D,
         env_allocator: EA,
-        scheduler: Box<dyn CampaignScheduler + Send>,
+        scheduler: Box<dyn CampaignScheduler<R> + Send>,
         state: S,
         options: ProjectOptions,
     ) -> Self {
@@ -118,10 +119,12 @@ where
         self.monitors.push(monitor);
     }
 
-    async fn handle_build_result<R: Revision>(&mut self, result: Result<ProjectBuild<R>, String>) {
+    async fn handle_build_result(&mut self, result: Result<ProjectBuild<R>, ProjectBuildFailure>) {
         match result {
             Ok(build) => self.handle_new_build(build).await,
-            Err(_) => {
+            Err(err) => {
+                log::warn!("Build for project '{}' failed: {:?}", self.config.name, err);
+
                 for monitor in self.monitors.iter_mut() {
                     monitor
                         .monitor_project_event(self.config.name.clone(), ProjectEvent::BuildFailure)
@@ -132,7 +135,7 @@ where
     }
 
     // Update active and retired harnesses when a new build is available.
-    async fn handle_new_build<R: Revision>(&mut self, build: ProjectBuild<R>) {
+    async fn handle_new_build(&mut self, build: ProjectBuild<R>) {
         let mut harnesses = self.harnesses.lock().await;
         let harness_names = harnesses.keys().cloned().collect::<HashSet<String>>();
 
@@ -299,7 +302,7 @@ where
         }
     }
 
-    pub async fn run<R, RT, B, Q>(
+    pub async fn run<RT, B, Q>(
         &mut self,
         revision_tracker: RT,
         builder: B,
@@ -316,8 +319,11 @@ where
         // creates a build for fuzzing it.
         let description = self.description.clone();
         let ignore_first_revision = self.options.ignore_first_revision;
-        tokio::spawn(async move {
+        let latest_revision = Arc::new(Mutex::new(None));
+        let latest_revision_clone = latest_revision.clone();
+        let _ = tokio::spawn(async move {
             let mut build_task = BuildTask::new(
+                latest_revision_clone,
                 revision_tracker,
                 builder,
                 description,
@@ -343,7 +349,7 @@ where
         self.wake_up_scheduler = Some(wake_up_tx);
         let scheduler_task = if !self.options.no_fuzzing {
             tokio::spawn(async move {
-                let mut campaign_scheduler_task: CampaignScheduleTask<E, EA, CH, C> =
+                let mut campaign_scheduler_task: CampaignScheduleTask<E, EA, CH, C, R> =
                     CampaignScheduleTask {
                         project_config: config,
                         schedule: scheduler,
@@ -353,6 +359,7 @@ where
                         wake_up_receiver: wake_up_rx,
                         campaign_event_sender: campaign_event_tx,
                         harnesses,
+                        latest_revision,
                         _phantom: std::marker::PhantomData::default(),
                     };
 
@@ -407,11 +414,12 @@ where
 
 struct BuildTask<R, RT, B, D> {
     current_revision: Option<R>,
+    latest_revision: Arc<Mutex<Option<R>>>,
     revision_tracker: RT,
     builder: B,
     description: D,
 
-    build_sender: Sender<Result<ProjectBuild<R>, String>>,
+    build_sender: Sender<Result<ProjectBuild<R>, ProjectBuildFailure>>,
     ignore_first_revision: bool,
 }
 
@@ -423,14 +431,16 @@ where
     D: ProjectDescription + Clone,
 {
     fn new(
+        latest_revision: Arc<Mutex<Option<R>>>,
         revision_tracker: RT,
         builder: B,
         description: D,
-        build_sender: Sender<Result<ProjectBuild<R>, String>>,
+        build_sender: Sender<Result<ProjectBuild<R>, ProjectBuildFailure>>,
         ignore_first_revision: bool,
     ) -> Self {
         Self {
             current_revision: None,
+            latest_revision,
             revision_tracker,
             builder,
             description,
@@ -465,6 +475,10 @@ where
                 )
                 .await;
 
+            if build.is_ok() {
+                *self.latest_revision.lock().await = self.current_revision.clone();
+            }
+
             if let Err(_) = self.build_sender.send(build).await {
                 // Notify project about new build
                 log::info!("Build task quit for project '{}'", config.name);
@@ -476,30 +490,33 @@ where
 
 type ScheduledCampaign<C> = (String, JoinHandle<C>, Sender<bool>);
 
-struct CampaignScheduleTask<E, EA, CH, C>
+struct CampaignScheduleTask<E, EA, CH, C, R>
 where
     E: Environment,
     EA: EnvironmentAllocator<E>,
     C: Campaign<E>,
+    R: Revision,
 {
     project_config: ProjectConfig,
-    schedule: Arc<Mutex<Box<dyn CampaignScheduler + Send>>>,
+    schedule: Arc<Mutex<Box<dyn CampaignScheduler<R> + Send>>>,
     campaign_sender: Sender<ScheduledCampaign<C>>,
     campaign_event_sender: Sender<CampaignEvent>,
     wake_up_receiver: Receiver<()>,
     env_allocator: EA,
     harnesses: SharedHarnessMap,
     corpus_herder: Arc<Mutex<CH>>,
+    latest_revision: Arc<Mutex<Option<R>>>,
 
     _phantom: std::marker::PhantomData<E>,
 }
 
-impl<E, EA, CH, C> CampaignScheduleTask<E, EA, CH, C>
+impl<E, EA, CH, C, R> CampaignScheduleTask<E, EA, CH, C, R>
 where
     E: Environment + Send + 'static,
     EA: EnvironmentAllocator<E>,
     CH: CorpusHerder<Vec<u8>> + Send + 'static,
     C: Campaign<E> + Send + 'static,
+    R: Revision + Send + Clone + 'static,
 {
     async fn run(&mut self) {
         log::info!(
@@ -526,7 +543,18 @@ where
                 self.project_config.name
             );
 
-            let env_params = match self.schedule.lock().await.next().await {
+            let latest_rev = match self.latest_revision.lock().await.clone() {
+                Some(rev) => rev,
+                None => {
+                    log::warn!(
+                        "No latest revision found for project '{}'",
+                        self.project_config.name
+                    );
+                    continue;
+                }
+            };
+
+            let env_params = match self.schedule.lock().await.next(latest_rev.clone()).await {
                 Ok(env_params) => env_params,
                 Err(err) => {
                     log::warn!(

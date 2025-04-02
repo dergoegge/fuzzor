@@ -115,7 +115,7 @@ fn spawn_native_go_log_parser(
             // fuzz: elapsed: 15s, execs: 184024 (12864/sec), new interesting: 9 (total: 9)
 
             let stats_regex =
-                    regex::Regex::new(r"fuzz: elapsed: [0-9]*s, execs: [0-9]* \((?<execs_per_sec>[0-9]*)/sec\), new interesting: [0-9]* \(total: (?<corpus>[0-9]*)\).*")
+                    regex::Regex::new(r"fuzz: elapsed: [0-9mshd]*, execs: [0-9]* \((?<execs_per_sec>[0-9]*)/sec\), new interesting: [0-9]* \(total: (?<corpus>[0-9]*)\).*")
                         .unwrap();
             log::trace!("native-go: {}", line);
             let Some(caps) = stats_regex.captures(&line) else {

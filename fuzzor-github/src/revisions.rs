@@ -27,6 +27,18 @@ impl Revision for GitHubRevision {
     fn modified_files(&self) -> &[String] {
         &self.files
     }
+
+    fn new(
+        commit_hash: String,
+        previous_commit_hash: Option<String>,
+        modified_files: Vec<String>,
+    ) -> Self {
+        Self {
+            head: commit_hash,
+            previous_head: previous_commit_hash,
+            files: modified_files,
+        }
+    }
 }
 
 pub enum GithubRevisionSource {

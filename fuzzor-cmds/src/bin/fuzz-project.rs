@@ -21,6 +21,7 @@ use fuzzor_docker::{
     builder::DockerBuilder,
     env::{DockerEnvAllocator, DockerMachine},
 };
+use fuzzor_github::revisions::GitHubRevision;
 use fuzzor_github::{
     reporter::GitHubRepoSolutionReporter,
     revisions::{GitHubRepository, GitHubRevisionTracker, GithubRevisionSource},
@@ -253,7 +254,7 @@ async fn main() -> Result<(), String> {
         DockerBuilder::new(builder_pool)
     };
 
-    let scheduler: Box<dyn CampaignScheduler + Send> =
+    let scheduler: Box<dyn CampaignScheduler<GitHubRevision> + Send> =
         if let Some(harnesses) = opts.harnesses.clone() {
             Box::new(OneShotScheduler::new(
                 folder.config(),
@@ -283,7 +284,7 @@ async fn main() -> Result<(), String> {
     .await?;
 
     let state = StdProjectState::new(state_location, corpus_herder);
-    let mut project = Project::<_, _, _, _, _, LocalCampaign<DockerEnv>>::new(
+    let mut project = Project::<_, _, _, _, _, LocalCampaign<DockerEnv>, GitHubRevision>::new(
         folder,
         docker_allocator,
         scheduler,

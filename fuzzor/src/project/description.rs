@@ -71,6 +71,10 @@ impl InMemoryProjectFolder {
         }
     }
 
+    pub fn new(config: ProjectConfig, tarball: Vec<u8>) -> Self {
+        Self { config, tarball }
+    }
+
     pub fn config_mut(&mut self) -> &mut ProjectConfig {
         &mut self.config
     }

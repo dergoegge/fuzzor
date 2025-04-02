@@ -13,3 +13,8 @@ engines:
 sanitizers:
 - Address # All cores are fuzzing with ASan
 - None    # For reproduction purposes only
+
+architecture: X86_64
+
+cpu_hours_per_campaign: 100
+report_repo: "dergoegge/fuzzor-reports"
