@@ -15,7 +15,7 @@ use crate::{
     revisions::{Revision, RevisionTracker},
 };
 use builder::{ProjectBuild, ProjectBuilder};
-use campaign::{Campaign, CampaignEvent, CampaignJoinHandle};
+use campaign::{Campaign, CampaignEvent};
 use description::ProjectDescription;
 use harness::{Harness, PersistentHarnessState, SharedHarnessMap};
 use monitor::ProjectMonitor;
@@ -23,6 +23,7 @@ use scheduler::{CampaignScheduler, CampaignSchedulerInput};
 use state::State;
 
 use fuzzor_infra::ProjectConfig;
+use tokio::task::JoinHandle;
 use tokio::{
     sync::{
         mpsc::{Receiver, Sender},
@@ -45,11 +46,12 @@ pub struct ProjectOptions {
     pub no_fuzzing: bool,
 }
 
-pub struct Project<E, D, EA, CH, S>
+pub struct Project<E, D, EA, CH, S, C>
 where
     E: Environment,
     CH: CorpusHerder<Vec<u8>> + Send,
     S: State<CH, PersistentHarnessState>,
+    C: Campaign<E> + Send + 'static,
 {
     description: D,
     config: ProjectConfig,
@@ -63,22 +65,23 @@ where
     env_allocator: EA,
     wake_up_scheduler: Option<Sender<()>>,
 
-    campaigns: HashMap<String, (CampaignJoinHandle<E>, Sender<bool>)>,
+    campaigns: HashMap<String, (JoinHandle<C>, Sender<bool>)>,
 
     monitors: Vec<Box<dyn ProjectMonitor + Send>>,
 
     options: ProjectOptions,
 
-    phantom: std::marker::PhantomData<CH>,
+    phantom: std::marker::PhantomData<(CH, E)>,
 }
 
-impl<E, D, EA, CH, S> Project<E, D, EA, CH, S>
+impl<E, D, EA, CH, S, C> Project<E, D, EA, CH, S, C>
 where
     E: Environment + Send + 'static,
     D: ProjectDescription + Clone + Send + 'static,
     EA: EnvironmentAllocator<E> + Clone + Send + 'static,
     CH: CorpusHerder<Vec<u8>> + Send + 'static,
     S: State<CH, PersistentHarnessState>,
+    C: Campaign<E> + Send + 'static,
 {
     pub fn new(
         description: D,
@@ -198,7 +201,7 @@ where
         }
     }
 
-    async fn handle_new_campaign(&mut self, campaign: ScheduledCampaign<E>) {
+    async fn handle_new_campaign(&mut self, campaign: ScheduledCampaign<C>) {
         if self.campaigns.contains_key(&campaign.0) {
             // This can happen if e.g. the coverage based scheduler with a round-robin fallback
             // schedules the same harness twice, once based on coverage and once based on the r-r.
@@ -220,10 +223,11 @@ where
     async fn finish_campaign(
         &mut self,
         harness: String,
-        campaign_handle: CampaignJoinHandle<E>,
+        campaign_handle: JoinHandle<C>,
         corpus: Option<Vec<u8>>,
     ) {
-        if let Ok(Campaign { env, .. }) = campaign_handle.await {
+        if let Ok(campaign) = campaign_handle.await {
+            let env = campaign.end().await;
             self.env_allocator.free(env).await;
         } else {
             log::error!(
@@ -339,7 +343,7 @@ where
         self.wake_up_scheduler = Some(wake_up_tx);
         let scheduler_task = if !self.options.no_fuzzing {
             tokio::spawn(async move {
-                let mut campaign_scheduler_task: CampaignScheduleTask<E, EA, CH> =
+                let mut campaign_scheduler_task: CampaignScheduleTask<E, EA, CH, C> =
                     CampaignScheduleTask {
                         project_config: config,
                         schedule: scheduler,
@@ -349,6 +353,7 @@ where
                         wake_up_receiver: wake_up_rx,
                         campaign_event_sender: campaign_event_tx,
                         harnesses,
+                        _phantom: std::marker::PhantomData::default(),
                     };
 
                 campaign_scheduler_task.run().await;
@@ -383,7 +388,8 @@ where
         for (_, (campaign_handle, quit)) in self.campaigns.drain() {
             let _ = quit.send(false).await;
 
-            if let Ok(Campaign { env, .. }) = campaign_handle.await {
+            if let Ok(campaign) = campaign_handle.await {
+                let env = campaign.end().await;
                 self.env_allocator.free(env).await;
             } else {
                 log::warn!("Couldn't free env for campaign!");
@@ -468,27 +474,32 @@ where
     }
 }
 
-type ScheduledCampaign<E> = (String, CampaignJoinHandle<E>, Sender<bool>);
+type ScheduledCampaign<C> = (String, JoinHandle<C>, Sender<bool>);
 
-struct CampaignScheduleTask<E, EA, CH>
+struct CampaignScheduleTask<E, EA, CH, C>
 where
     E: Environment,
+    EA: EnvironmentAllocator<E>,
+    C: Campaign<E>,
 {
     project_config: ProjectConfig,
     schedule: Arc<Mutex<Box<dyn CampaignScheduler + Send>>>,
-    campaign_sender: Sender<ScheduledCampaign<E>>,
+    campaign_sender: Sender<ScheduledCampaign<C>>,
     campaign_event_sender: Sender<CampaignEvent>,
     wake_up_receiver: Receiver<()>,
     env_allocator: EA,
     harnesses: SharedHarnessMap,
     corpus_herder: Arc<Mutex<CH>>,
+
+    _phantom: std::marker::PhantomData<E>,
 }
 
-impl<E, EA, CH> CampaignScheduleTask<E, EA, CH>
+impl<E, EA, CH, C> CampaignScheduleTask<E, EA, CH, C>
 where
     E: Environment + Send + 'static,
     EA: EnvironmentAllocator<E>,
     CH: CorpusHerder<Vec<u8>> + Send + 'static,
+    C: Campaign<E> + Send + 'static,
 {
     async fn run(&mut self) {
         log::info!(
@@ -590,7 +601,7 @@ where
             // Run the campaign in a separate task.
             let project_config = self.project_config.clone();
             let campaign_task = tokio::spawn(async move {
-                let mut campaign = Campaign::new(project_config, harness, env, event_sender).await;
+                let mut campaign = C::new(project_config, harness, env, event_sender).await;
                 campaign.run(quit_rx).await;
                 campaign
             });

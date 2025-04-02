@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 
+use fuzzor::project::campaign::LocalCampaign;
 use fuzzor::{
     corpora::VersionedOverwritingHerder,
     env::ResourcePool,
@@ -15,6 +16,7 @@ use fuzzor::{
     },
     solutions::reporter::{QuittingSolutionReporter, StdErrSolutionReporter},
 };
+use fuzzor_docker::env::DockerEnv;
 use fuzzor_docker::{
     builder::DockerBuilder,
     env::{DockerEnvAllocator, DockerMachine},
@@ -281,7 +283,7 @@ async fn main() -> Result<(), String> {
     .await?;
 
     let state = StdProjectState::new(state_location, corpus_herder);
-    let mut project = Project::new(
+    let mut project = Project::<_, _, _, _, _, LocalCampaign<DockerEnv>>::new(
         folder,
         docker_allocator,
         scheduler,

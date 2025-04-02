@@ -36,7 +36,21 @@ pub enum CampaignEvent {
     Quit(String, Option<Vec<u8>>),
 }
 
-pub struct Campaign<E> {
+#[async_trait::async_trait]
+pub trait Campaign<E> {
+    async fn new(
+        project_config: ProjectConfig,
+        harness: Arc<Mutex<Harness>>,
+        env: E,
+        event_sender: Sender<CampaignEvent>,
+    ) -> Self;
+
+    async fn run(&mut self, quit_rx: Receiver<bool>);
+
+    async fn end(self) -> E;
+}
+
+pub struct LocalCampaign<E> {
     // Fuzzing environment for this campaign
     pub env: E,
     // Harness being fuzzed by this campaign
@@ -52,11 +66,12 @@ pub struct Campaign<E> {
     project_config: ProjectConfig,
 }
 
-impl<E> Campaign<E>
+#[async_trait::async_trait]
+impl<E> Campaign<E> for LocalCampaign<E>
 where
-    E: Environment,
+    E: Environment + Send,
 {
-    pub async fn new(
+    async fn new(
         project_config: ProjectConfig,
         harness: Arc<Mutex<Harness>>,
         env: E,
@@ -82,157 +97,7 @@ where
         }
     }
 
-    async fn new_state(&mut self, new_state: CampaignState) {
-        match (self.state, new_state) {
-            (CampaignState::Scheduled, CampaignState::Fuzzing) => {}
-            (_, CampaignState::Ended) => {}
-
-            (old, new) => log::error!("Invalid campaign state transition: {:?} -> {:?}", old, new),
-        }
-
-        log::trace!("New campaign state: {:?} -> {:?}", self.state, new_state);
-
-        let prev_state = self.state;
-        self.state = new_state;
-
-        self.send_event(CampaignEvent::NewState(
-            self.harness_name.clone(),
-            prev_state,
-            self.state,
-        ))
-        .await;
-    }
-
-    async fn send_event(&mut self, event: CampaignEvent) {
-        log::trace!("Sending event: {:?}", &event);
-
-        if let Err(err) = self.event_sender.send(event).await {
-            log::error!("Failed to fire event: {:?}", err);
-        }
-    }
-
-    async fn process_solutions(&mut self, mut solutions: Vec<Solution>) {
-        let quit = !solutions.is_empty();
-
-        let mut non_new_solutions = HashMap::new();
-        for solution in solutions.drain(..) {
-            let solution_id = solution.id().to_string();
-
-            let solutions = self.harness.lock().await.state().solutions().await;
-
-            let new_solution = solutions.lock().await.submit(solution.clone()).await;
-
-            if new_solution {
-                log::info!(
-                    "Stored new solution harness={} id={}",
-                    self.harness_name,
-                    &solution_id,
-                );
-
-                // Only notify for solutions that are not a duplicate of a previously found solution.
-                self.send_event(CampaignEvent::NewSolution(
-                    self.harness_name.clone(),
-                    solution,
-                ))
-                .await;
-            } else if let Ok(count) = non_new_solutions.try_insert(solution_id, 1) {
-                *count += 1;
-            }
-        }
-
-        for (id, count) in non_new_solutions.iter() {
-            log::info!(
-                "Did not store {} duplicate solutions with id={} for harness={}",
-                count,
-                id,
-                &self.harness_name,
-            );
-        }
-
-        if quit {
-            // We end the campaign if there are any solutions . Solutions tend to block fuzzers
-            // from making progress in any case, so there is little value in continuing (we
-            // would just be wasting resources).
-            self.new_state(CampaignState::Ended).await;
-        }
-    }
-
-    async fn process_stats(&mut self, stats: FuzzerStats) {
-        if self.state == CampaignState::Scheduled && stats.execs_per_sec > 0.0 {
-            self.new_state(CampaignState::Fuzzing).await;
-        }
-
-        let total_solutions = stats.saved_crashes + stats.saved_hangs;
-        let found_solutions = total_solutions > 0;
-
-        {
-            let mut harness = self.harness.lock().await;
-            harness.state_mut().record_stats(stats.clone()).await;
-        }
-
-        if self
-            .last_reported_stats
-            .as_ref()
-            .map_or(true, |last_reported_stats| {
-                // Report new stats if we found any solutions or if the corpus grew.
-                found_solutions || stats.corpus_count > last_reported_stats.corpus_count
-            })
-        {
-            self.send_event(CampaignEvent::Stats(
-                self.harness_name.clone(),
-                stats.clone(),
-            ))
-            .await;
-            self.last_reported_stats = Some(stats.clone());
-        }
-
-        if !found_solutions {
-            // Shortcurcuit since there are no solutions to download
-            return;
-        }
-
-        match self.env.get_solutions().await {
-            Ok(solutions) => {
-                let reproduced_hangs = solutions
-                    .iter()
-                    .filter(|s| matches!(s.metadata(), SolutionMetadata::Timeout(_)))
-                    .count() as u64;
-                if reproduced_hangs < stats.saved_hangs {
-                    log::warn!(
-                        "{} hangs did not reproduce (harness={}, project={})",
-                        stats.saved_hangs - reproduced_hangs,
-                        self.harness_name,
-                        self.project_config.name
-                    );
-                }
-
-                let reproduced_crashes = solutions
-                    .iter()
-                    .filter(|s| matches!(s.metadata(), SolutionMetadata::Crash(_)))
-                    .count() as u64;
-                let mut end = false;
-                if stats.saved_crashes > 0 && reproduced_crashes == 0 {
-                    log::error!(
-                        "{} crashes did not reproduce (harness={}, project={})",
-                        stats.saved_crashes - reproduced_crashes,
-                        self.harness_name,
-                        self.project_config.name
-                    );
-
-                    end = true;
-                }
-
-                self.process_solutions(solutions).await;
-
-                if end {
-                    self.new_state(CampaignState::Ended).await;
-                }
-            }
-            Err(err) => log::warn!("{}", err),
-        }
-    }
-
-    pub async fn run(&mut self, mut quit_rx: Receiver<bool>) {
+    async fn run(&mut self, mut quit_rx: Receiver<bool>) {
         self.send_event(CampaignEvent::Initialized(self.harness_name.clone()))
             .await;
 
@@ -389,6 +254,163 @@ where
             &self.env.get_id().await[..8]
         );
     }
+
+    async fn end(self) -> E {
+        self.env
+    }
 }
 
-pub type CampaignJoinHandle<E> = JoinHandle<Campaign<E>>;
+impl<E> LocalCampaign<E>
+where
+    E: Environment,
+{
+    async fn new_state(&mut self, new_state: CampaignState) {
+        match (self.state, new_state) {
+            (CampaignState::Scheduled, CampaignState::Fuzzing) => {}
+            (_, CampaignState::Ended) => {}
+
+            (old, new) => log::error!("Invalid campaign state transition: {:?} -> {:?}", old, new),
+        }
+
+        log::trace!("New campaign state: {:?} -> {:?}", self.state, new_state);
+
+        let prev_state = self.state;
+        self.state = new_state;
+
+        self.send_event(CampaignEvent::NewState(
+            self.harness_name.clone(),
+            prev_state,
+            self.state,
+        ))
+        .await;
+    }
+
+    async fn send_event(&mut self, event: CampaignEvent) {
+        log::trace!("Sending event: {:?}", &event);
+
+        if let Err(err) = self.event_sender.send(event).await {
+            log::error!("Failed to fire event: {:?}", err);
+        }
+    }
+
+    async fn process_solutions(&mut self, mut solutions: Vec<Solution>) {
+        let quit = !solutions.is_empty();
+
+        let mut non_new_solutions = HashMap::new();
+        for solution in solutions.drain(..) {
+            let solution_id = solution.id().to_string();
+
+            let solutions = self.harness.lock().await.state().solutions().await;
+
+            let new_solution = solutions.lock().await.submit(solution.clone()).await;
+
+            if new_solution {
+                log::info!(
+                    "Stored new solution harness={} id={}",
+                    self.harness_name,
+                    &solution_id,
+                );
+
+                // Only notify for solutions that are not a duplicate of a previously found solution.
+                self.send_event(CampaignEvent::NewSolution(
+                    self.harness_name.clone(),
+                    solution,
+                ))
+                .await;
+            } else if let Ok(count) = non_new_solutions.try_insert(solution_id, 1) {
+                *count += 1;
+            }
+        }
+
+        for (id, count) in non_new_solutions.iter() {
+            log::info!(
+                "Did not store {} duplicate solutions with id={} for harness={}",
+                count,
+                id,
+                &self.harness_name,
+            );
+        }
+
+        if quit {
+            // We end the campaign if there are any solutions . Solutions tend to block fuzzers
+            // from making progress in any case, so there is little value in continuing (we
+            // would just be wasting resources).
+            self.new_state(CampaignState::Ended).await;
+        }
+    }
+
+    async fn process_stats(&mut self, stats: FuzzerStats) {
+        if self.state == CampaignState::Scheduled && stats.execs_per_sec > 0.0 {
+            self.new_state(CampaignState::Fuzzing).await;
+        }
+
+        let total_solutions = stats.saved_crashes + stats.saved_hangs;
+        let found_solutions = total_solutions > 0;
+
+        {
+            let mut harness = self.harness.lock().await;
+            harness.state_mut().record_stats(stats.clone()).await;
+        }
+
+        if self
+            .last_reported_stats
+            .as_ref()
+            .map_or(true, |last_reported_stats| {
+                // Report new stats if we found any solutions or if the corpus grew.
+                found_solutions || stats.corpus_count > last_reported_stats.corpus_count
+            })
+        {
+            self.send_event(CampaignEvent::Stats(
+                self.harness_name.clone(),
+                stats.clone(),
+            ))
+            .await;
+            self.last_reported_stats = Some(stats.clone());
+        }
+
+        if !found_solutions {
+            // Shortcurcuit since there are no solutions to download
+            return;
+        }
+
+        match self.env.get_solutions().await {
+            Ok(solutions) => {
+                let reproduced_hangs = solutions
+                    .iter()
+                    .filter(|s| matches!(s.metadata(), SolutionMetadata::Timeout(_)))
+                    .count() as u64;
+                if reproduced_hangs < stats.saved_hangs {
+                    log::warn!(
+                        "{} hangs did not reproduce (harness={}, project={})",
+                        stats.saved_hangs - reproduced_hangs,
+                        self.harness_name,
+                        self.project_config.name
+                    );
+                }
+
+                let reproduced_crashes = solutions
+                    .iter()
+                    .filter(|s| matches!(s.metadata(), SolutionMetadata::Crash(_)))
+                    .count() as u64;
+                let mut end = false;
+                if stats.saved_crashes > 0 && reproduced_crashes == 0 {
+                    log::error!(
+                        "{} crashes did not reproduce (harness={}, project={})",
+                        stats.saved_crashes - reproduced_crashes,
+                        self.harness_name,
+                        self.project_config.name
+                    );
+
+                    end = true;
+                }
+
+                self.process_solutions(solutions).await;
+
+                if end {
+                    self.new_state(CampaignState::Ended).await;
+                }
+            }
+            Err(err) => log::warn!("{}", err),
+        }
+    }
+}
