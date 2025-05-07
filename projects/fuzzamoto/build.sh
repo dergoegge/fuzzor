@@ -31,7 +31,6 @@ cmake -B build_fuzz \
   `# Setting these flags to an empty string ensures that the flags set by the Fuzzor environment remain unaltered` \
   -DCMAKE_C_FLAGS_RELWITHDEBINFO="" \
   -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="" \
-  -DENABLE_HARDENING=OFF \
   -DWITH_BDB=ON \
   -DAPPEND_CPPFLAGS="-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DABORT_ON_FAILED_ASSUME" \
   $EXTRA_BUILD_OPTIONS
