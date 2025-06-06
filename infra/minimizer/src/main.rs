@@ -122,7 +122,10 @@ async fn minimize_with_honggfuzz(
     harness: &str,
     config: &ProjectConfig,
 ) -> Result<bool, std::io::Error> {
-    if !config.has_engine(&FuzzEngine::HonggFuzz) || !config.has_sanitizer(&Sanitizer::None) {
+    if !config.has_engine(&FuzzEngine::HonggFuzz)
+        || !config.has_sanitizer(&Sanitizer::None)
+        || std::env::var("FUZZOR_HONGGFUZZ_NO_MINIMIZE").is_ok()
+    {
         return Ok(false);
     }
 

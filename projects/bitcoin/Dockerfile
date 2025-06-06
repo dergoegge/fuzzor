@@ -20,6 +20,8 @@ RUN echo "unsigned-integer-overflow:FuzzedDataProvider.h" >> ./ubsan_suppression
 COPY ./config.yaml .
 COPY ./build.sh .
 
+ENV FUZZOR_HONGGFUZZ_NO_MINIMIZE=1
+
 RUN --mount=type=cache,target=/ccache/ \
     --mount=type=cache,target=/ccache_cmplog/ \
     --mount=type=cache,target=/ccache_asan/ \
