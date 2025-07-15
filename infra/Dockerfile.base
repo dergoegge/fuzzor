@@ -1,6 +1,6 @@
 ARG GCC_V=14
 
-FROM debian:sid-slim AS llvm_builder
+FROM debian:trixie-slim AS llvm_builder
 
 ARG GCC_V
 ENV GCC_V=$GCC_V
@@ -53,38 +53,12 @@ RUN --mount=type=cache,target=/ccache/ \
           -DLLVM_USE_SANITIZER=MemoryWithOrigins && \
     ninja -C /libcxx_msan "-j$(nproc)"
 
-# We could use the official rust: images here, but they are based on
-# earlier versions of Debian, that lead to issues when trying to run
-# the sid-built clang from llvm_builder
-FROM debian:sid-slim AS rust_builder
-
-COPY --from=llvm_builder /llvm_build* /usr/
-
-RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-  curl \
-  gcc \
-  git \
-  libglib2.0-dev \
-  make \
-  meson \
-  ninja-build \
-  pkg-config \
-  python3-venv
-
-RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
-
-RUN cargo install rustfilt
-
-#RUN git clone https://github.com/dergoegge/semsan.git
-#RUN cd semsan && cargo install --path . --verbose \
-#              && cargo install --features qemu_aarch64 --bin semsan-aarch64 --path . \
-#              && cargo install --features qemu_arm --bin semsan-arm --path . \
-#              && cargo install --features qemu_x86_64 --bin semsan-x86_64 --path . \
-#              && cargo install --features qemu_i386 --bin semsan-i386 --path .
+FROM rust:1.88.0-slim-trixie AS rust_builder
 
 WORKDIR /fuzzor
 COPY . .
+
+RUN cargo install rustfilt
 RUN cargo install --verbose --path infra/builder
 RUN cargo install --verbose --path infra/reproducer
 RUN cargo install --verbose --path infra/ensemble-fuzz
@@ -92,24 +66,25 @@ RUN cargo install --verbose --path infra/coverage-reporter
 RUN cargo install --verbose --path infra/minimizer
 RUN cargo install --verbose --path infra/fuzzer
 
-FROM debian:sid-slim
+FROM debian:trixie-slim
 
 ARG GCC_V
 ENV GCC_V=$GCC_V
 
 COPY --from=llvm_builder /llvm_build* /usr/
 COPY --from=llvm_builder /libcxx_msan /libcxx_msan
+COPY --from=rust_builder /fuzzor/infra/toolchains /toolchains
+
 # Be selective, so we don't copy rustc/cargo etc, which may interfere
 # with other builds later, i.e rust-lightning
-COPY --from=rust_builder /root/.cargo/bin/builder \
-                         /root/.cargo/bin/coverage-reporter \
-                         /root/.cargo/bin/ensemble-fuzz \
-                         /root/.cargo/bin/fuzzer \
-                         /root/.cargo/bin/minimizer \
-                         /root/.cargo/bin/reproducer \
-                         /root/.cargo/bin/semsam* \
+COPY --from=rust_builder /usr/local/cargo/bin/builder \
+                         /usr/local/cargo/bin/coverage-reporter \
+                         /usr/local/cargo/bin/ensemble-fuzz \
+                         /usr/local/cargo/bin/fuzzer \
+                         /usr/local/cargo/bin/minimizer \
+                         /usr/local/cargo/bin/reproducer \
+                         /usr/local/cargo/bin/semsam* \
                          /usr/local/bin/
-COPY --from=rust_builder /fuzzor/infra/toolchains /toolchains
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
   autotools-dev \
