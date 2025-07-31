@@ -4,6 +4,19 @@ Work in progress continuous fuzzing infrastructure. Mainly build and maintained
 to continuously fuzz [Bitcoin Core](https://github.com/bitcoin/bitcoin) but
 support for adding and fuzzing other projects is available (see `projects/`).
 
+## Quick Start
+
+```bash
+docker build --tag fuzzor-base:latest --file infra/Dockerfile.base .
+
+cd projects/bitcoin
+docker build --tag fuzzor-bitcoin:latest .
+
+docker run -it fuzzor-bitcoin:latest
+
+FUZZ=txgraph ./out/libfuzzer_asan/fuzz
+```
+
 ## Features
 
 - Automatic bug reports
