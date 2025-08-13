@@ -145,7 +145,7 @@ impl FuzzerConfiguration {
 
         // Set ASAN options
         command.env("ASAN_OPTIONS", 
-            "strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:abort_on_error=1:symbolize=0");
+            "strict_string_checks=1:detect_invalid_pointer_pairs=2:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:abort_on_error=1:symbolize=0");
 
         // Add all configured fuzzers
         for (engine, sanitizer) in &self.supported_fuzzers {

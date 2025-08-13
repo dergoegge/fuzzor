@@ -162,7 +162,7 @@ ENV ASAN_SYMBOLIZER_PATH="/usr/bin/llvm-symbolizer"
 ENV MSAN_SYMBOLIZER_PATH="/usr/bin/llvm-symbolizer"
 
 RUN touch ubsan_suppressions
-ENV ASAN_OPTIONS="strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:abort_on_error=1:exitcode=75"
+ENV ASAN_OPTIONS="strict_string_checks=1:detect_invalid_pointer_pairs=2:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:abort_on_error=1:exitcode=75"
 ENV UBSAN_OPTIONS="suppressions=/workdir/ubsan_suppressions:print_stacktrace=1:halt_on_error=1:report_error_type=1:exitcode=76"
 
 # Enable env_logger by default with level info
