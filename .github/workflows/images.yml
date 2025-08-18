@@ -16,7 +16,7 @@ jobs:
   build-base-image:
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build base fuzzor image
         run: |
           docker system prune --force
@@ -25,41 +25,41 @@ jobs:
     needs: [build-base-image]
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build bitcoin fuzzor image
         run: cd projects/bitcoin && docker buildx build --tag fuzzor-bitcoin:latest .
   build-lnd:
     needs: [build-base-image]
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build lnd fuzzor image
         run: cd projects/lnd && docker buildx build --tag fuzzor-lnd:latest .
   build-core-lightning:
     needs: [build-base-image]
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build core-lightning fuzzor image
         run: cd projects/core-lightning && docker buildx build --tag fuzzor-core-lightning:latest .
   build-rust-lightning:
     needs: [build-base-image]
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build rust-lightning fuzzor image
         run: cd projects/rust-lightning && docker buildx build --tag fuzzor-rust-lightning:latest .
   build-openssl:
     needs: [build-base-image]
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build openssl fuzzor image
         run: cd projects/openssl && docker buildx build --tag fuzzor-openssl:latest .
   build-secp256k1:
     needs: [build-base-image]
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build secp256k1 fuzzor image
         run: cd projects/secp256k1 && docker buildx build --tag fuzzor-secp256k1:latest .
