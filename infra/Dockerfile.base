@@ -53,7 +53,7 @@ RUN --mount=type=cache,target=/ccache/ \
           -DLLVM_USE_SANITIZER=MemoryWithOrigins && \
     ninja -C /libcxx_msan "-j$(nproc)"
 
-FROM rust:1.89.0-slim-trixie AS rust_builder
+FROM rust:1.90.0-slim-trixie AS rust_builder
 
 WORKDIR /fuzzor
 COPY . .
