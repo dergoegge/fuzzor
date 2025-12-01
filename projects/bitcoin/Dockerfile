@@ -12,12 +12,6 @@ RUN make -C bitcoin/depends NO_QT=1 NO_ZMQ=1 NO_USDT=1 NO_IPC=1 download-linux S
 
 RUN mv ./bitcoin/test/sanitizer_suppressions/ubsan ./ubsan_suppressions
 
-# Globally suppress unsigned-integer-overflow in FuzzedDataProvider.h. Symbolized
-# suppression is working, however sometimes the stacktrace seems to be missing symbols
-# (see https://github.com/dergoegge/fuzzor/issues/49).
-RUN echo "unsigned-integer-overflow:FuzzedDataProvider.h" >> ./ubsan_suppressions
-RUN echo "unsigned-integer-overflow:InsecureRandomContext::InsecureRandomContext" >> ./ubsan_suppressions
-
 COPY ./config.yaml .
 COPY ./build.sh .
 

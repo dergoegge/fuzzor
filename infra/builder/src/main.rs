@@ -44,9 +44,9 @@ const AFL_CLANG_CXX: &str = "afl-clang-fast++";
 const AFL_GCC_CC: &str = "afl-gcc-fast";
 const AFL_GCC_CXX: &str = "afl-g++-fast";
 const SANITIZE_UNDEFINED_LD: &str = "-fsanitize=array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr";
-const SANITIZE_UNDEFINED: &str = "-fsanitize=array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr -O2";
+const SANITIZE_UNDEFINED: &str = "-fsanitize=array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr -O2 -g";
 const SANITIZE_UNDEFINED_FUZZER: &str = "-fsanitize=fuzzer,array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr";
-const SANITIZE_UNDEFINED_FUZZER_NO_LINK: &str = "-fsanitize=fuzzer-no-link,array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr -O2";
+const SANITIZE_UNDEFINED_FUZZER_NO_LINK: &str = "-fsanitize=fuzzer-no-link,array-bounds,bool,builtin,enum,integer-divide-by-zero,null,return,returns-nonnull-attribute,shift,signed-integer-overflow,unsigned-integer-overflow,unreachable,vla-bound,vptr -O2 -g";
 
 async fn build_cpp(
     script: &PathBuf,

@@ -19,9 +19,7 @@ fi
 
 cmake -B build_fuzz \
   --toolchain depends/$(./depends/config.guess)/toolchain.cmake \
-  `# Setting these flags to an empty string ensures that the flags set by an OSS-Fuzz environment remain unaltered` \
-  -DCMAKE_C_FLAGS_RELWITHDEBINFO="" \
-  -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="" \
+  -DCMAKE_BUILD_TYPE=None \
   -DBUILD_FOR_FUZZING=ON \
   -DFUZZ_LIBS="$LIB_FUZZING_ENGINE" \
   $EXTRA_BUILD_OPTIONS
