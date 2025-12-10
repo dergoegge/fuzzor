@@ -9,7 +9,7 @@ ARG BRANCH=master
 ARG REVISION=
 
 RUN git clone --depth 1 --branch $BRANCH https://github.com/$OWNER/$REPO.git
-RUN git clone https://github.com/fanquake/cryptofuzz.git
+RUN git clone --branch 1_fixups https://github.com/fanquake/cryptofuzz.git
 RUN curl https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2 -o boost_1_86_0.tar.bz2 && \
     tar jxf boost_1_86_0.tar.bz2 && \
     cp -R boost_1_86_0/boost/ /usr/include/ && \
