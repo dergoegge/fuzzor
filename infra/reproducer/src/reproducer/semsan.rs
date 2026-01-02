@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::error::Error;
 
 use std::fmt::{self, Display};
@@ -24,7 +25,28 @@ impl Error for SemSanReproducerError {}
 
 impl Display for SemSanReproducerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        match self {
+            SemSanReproducerError::FailedToCreateWorkdir => write!(f, "Failed to create workdir"),
+            SemSanReproducerError::FailedToCreateSeedsDir => {
+                write!(f, "Failed to create seeds dir")
+            }
+            SemSanReproducerError::FailedToCreateSolutionsDir => {
+                write!(f, "Failed to create solutions dir")
+            }
+            SemSanReproducerError::FailedToCopyTestCase => write!(f, "Failed to copy test case"),
+            SemSanReproducerError::FailedToRunSemSan => write!(f, "Failed to run semsan"),
+            SemSanReproducerError::FailedToParseFileInfo => write!(f, "Failed to parse file info"),
+            SemSanReproducerError::FailedToCreateStderrFile => {
+                write!(f, "Failed to create stderr file")
+            }
+            SemSanReproducerError::FailedToReadStderrFile => {
+                write!(f, "Failed to read stderr file")
+            }
+            SemSanReproducerError::FailedToReadTestCase => write!(f, "Failed to read test case"),
+            SemSanReproducerError::SolutionNotReproducible => {
+                write!(f, "Solution not reproducible")
+            }
+        }
     }
 }
 
@@ -115,6 +137,10 @@ impl Reproducer<SemSanReproducerError> for SemSanReproducer {
             .arg("--solutions")
             .arg(&solutions_dir)
             .arg("--run-seeds-once");
+
+        // Collect host environment variables to pass to the harness (e.g., FUZZ=harness_name)
+        let host_env: HashMap<String, String> = std::env::vars().collect();
+        semsan_cmd.envs(host_env);
 
         let stderr_path = workdir.path().join("stderr.txt");
         let stderr = std::fs::File::create(&stderr_path)

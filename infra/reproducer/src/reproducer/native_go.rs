@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::error::Error;
 
 use std::fmt::{self, Display};
@@ -58,11 +59,15 @@ impl Reproducer<NativeGoReproducerError> for NativeGoReproducer {
             return Err(NativeGoReproducerError::FailedToCreateOutputFile);
         };
 
+        // Collect host environment variables to pass to the harness
+        let host_env: HashMap<String, String> = std::env::vars().collect();
+
         let status = tokio::process::Command::new("bash")
             .arg(&self.harness_binary)
             .arg("/tmp")
             .stdout(stdout)
             .stderr(stderr)
+            .envs(host_env)
             .kill_on_drop(true)
             .status()
             .await

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::error::Error;
 
 use std::fmt::{self, Display};
@@ -32,7 +33,52 @@ impl Error for LibFuzzerReproducerError {}
 
 impl Display for LibFuzzerReproducerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        match self {
+            LibFuzzerReproducerError::FailedToCreateOutputFile => {
+                write!(f, "Failed to create output file")
+            }
+            LibFuzzerReproducerError::FailedToRunHarness => write!(f, "Failed to run harness"),
+            LibFuzzerReproducerError::FailedToReadOutputFile => {
+                write!(f, "Failed to read output file")
+            }
+            LibFuzzerReproducerError::FailedToReadTestCase => write!(f, "Failed to read test case"),
+            LibFuzzerReproducerError::FailedToCreateWorkdir => {
+                write!(f, "Failed to create workdir")
+            }
+            LibFuzzerReproducerError::FailedToCreatePerfOutputFile => {
+                write!(f, "Failed to create perf output file")
+            }
+            LibFuzzerReproducerError::FailedToRunPerfRecord => {
+                write!(f, "Failed to run perf record")
+            }
+            LibFuzzerReproducerError::FailedToCreatePerfScriptFile => {
+                write!(f, "Failed to create perf script file")
+            }
+            LibFuzzerReproducerError::FailedToRunPerfScript => {
+                write!(f, "Failed to run perf script")
+            }
+            LibFuzzerReproducerError::FailedToRunStackcollapse => {
+                write!(f, "Failed to run stackcollapse")
+            }
+            LibFuzzerReproducerError::FailedToRunFlameGraph => {
+                write!(f, "Failed to run flamegraph")
+            }
+            LibFuzzerReproducerError::FlameGraphRepoNotConfigured => {
+                write!(f, "FlameGraph repo not configured")
+            }
+            LibFuzzerReproducerError::FailedToCreateFoldedFile => {
+                write!(f, "Failed to create folded file")
+            }
+            LibFuzzerReproducerError::FailedToCreateFlameGraphFile => {
+                write!(f, "Failed to create flamegraph file")
+            }
+            LibFuzzerReproducerError::FailedToReadFlameGraphFile => {
+                write!(f, "Failed to read flamegraph file")
+            }
+            LibFuzzerReproducerError::SolutionNotReproducible => {
+                write!(f, "Solution not reproducible")
+            }
+        }
     }
 }
 
@@ -59,6 +105,9 @@ impl LibFuzzerReproducer {
         std::fs::File::create(&perf_output_file_path)
             .map_err(|_| LibFuzzerReproducerError::FailedToCreatePerfOutputFile)?;
 
+        // Collect host environment variables to pass to the harness (e.g., FUZZ=harness_name)
+        let host_env: HashMap<String, String> = std::env::vars().collect();
+
         tokio::process::Command::new("perf")
             .args(&["record", "-g", "--output"])
             .arg(&perf_output_file_path)
@@ -66,6 +115,7 @@ impl LibFuzzerReproducer {
             .arg(&self.harness_binary)
             .arg("-runs=5")
             .arg(&self.test_case)
+            .envs(&host_env)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .kill_on_drop(true)
@@ -149,6 +199,9 @@ impl Reproducer<LibFuzzerReproducerError> for LibFuzzerReproducer {
             .await
             .map_err(|_| LibFuzzerReproducerError::FailedToReadTestCase)?;
 
+        // Collect host environment variables to pass to the harness (e.g., FUZZ=harness_name)
+        let host_env: HashMap<String, String> = std::env::vars().collect();
+
         let status = tokio::process::Command::new(&self.harness_binary)
             .args(vec![
                 "-error_exitcode=77",
@@ -156,6 +209,7 @@ impl Reproducer<LibFuzzerReproducerError> for LibFuzzerReproducer {
                 "-timeout=1",
             ])
             .arg(&self.test_case)
+            .envs(host_env)
             .stdout(stdout)
             .stderr(stderr)
             .kill_on_drop(true)
