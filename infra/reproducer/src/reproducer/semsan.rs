@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::error::Error;
 
 use std::fmt::{self, Display};
@@ -137,10 +136,6 @@ impl Reproducer<SemSanReproducerError> for SemSanReproducer {
             .arg("--solutions")
             .arg(&solutions_dir)
             .arg("--run-seeds-once");
-
-        // Collect host environment variables to pass to the harness (e.g., FUZZ=harness_name)
-        let host_env: HashMap<String, String> = std::env::vars().collect();
-        semsan_cmd.envs(host_env);
 
         let stderr_path = workdir.path().join("stderr.txt");
         let stderr = std::fs::File::create(&stderr_path)

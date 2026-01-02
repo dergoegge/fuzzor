@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::error::Error;
 
 use std::fmt::{self, Display};
@@ -105,9 +104,6 @@ impl LibFuzzerReproducer {
         std::fs::File::create(&perf_output_file_path)
             .map_err(|_| LibFuzzerReproducerError::FailedToCreatePerfOutputFile)?;
 
-        // Collect host environment variables to pass to the harness (e.g., FUZZ=harness_name)
-        let host_env: HashMap<String, String> = std::env::vars().collect();
-
         tokio::process::Command::new("perf")
             .args(&["record", "-g", "--output"])
             .arg(&perf_output_file_path)
@@ -115,7 +111,6 @@ impl LibFuzzerReproducer {
             .arg(&self.harness_binary)
             .arg("-runs=5")
             .arg(&self.test_case)
-            .envs(&host_env)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .kill_on_drop(true)
@@ -199,9 +194,6 @@ impl Reproducer<LibFuzzerReproducerError> for LibFuzzerReproducer {
             .await
             .map_err(|_| LibFuzzerReproducerError::FailedToReadTestCase)?;
 
-        // Collect host environment variables to pass to the harness (e.g., FUZZ=harness_name)
-        let host_env: HashMap<String, String> = std::env::vars().collect();
-
         let status = tokio::process::Command::new(&self.harness_binary)
             .args(vec![
                 "-error_exitcode=77",
@@ -209,7 +201,6 @@ impl Reproducer<LibFuzzerReproducerError> for LibFuzzerReproducer {
                 "-timeout=1",
             ])
             .arg(&self.test_case)
-            .envs(host_env)
             .stdout(stdout)
             .stderr(stderr)
             .kill_on_drop(true)
