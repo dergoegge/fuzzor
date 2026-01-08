@@ -12,7 +12,7 @@ use fuzzor_infra::{FuzzEngine, ProjectConfig, Sanitizer};
 
 use futures_util::StreamExt;
 
-use crate::env::DockerMachine;
+use crate::env::{connect_to_docker, DockerMachine};
 
 pub struct DockerBuilder {
     machines: ResourcePool<DockerMachine>,
@@ -195,15 +195,7 @@ where
     async fn build(&mut self, folder: PD, revision: R) -> Result<ProjectBuild<R>, String> {
         let machine = self.machines.take_one().await;
 
-        let docker = bollard::Docker::connect_with_http(
-            &machine.daemon_addr,
-            120,
-            &bollard::ClientVersion {
-                minor_version: 1,
-                major_version: 44,
-            },
-        )
-        .map_err(|e| format!("Could not connect to docker daemon: {}", e))?;
+        let docker = connect_to_docker(&machine.daemon_addr)?;
         // TODO If we return here due to an error, we won't add the machine back to the pool
 
         let config = folder.config();

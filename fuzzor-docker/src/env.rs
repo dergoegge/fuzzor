@@ -15,6 +15,23 @@ use serde::{Deserialize, Serialize};
 pub const ENSEMBLE_DIR: &str = "/workdir/workspace";
 pub const LIBFUZZER_STACK_TRACE_SUFFIX: &str = ".libfuzzer.crash";
 
+/// Connect to Docker daemon, handling both Unix sockets and HTTP URLs
+pub fn connect_to_docker(daemon_addr: &str) -> Result<bollard::Docker, String> {
+    let client_version = bollard::ClientVersion {
+        minor_version: 1,
+        major_version: 44,
+    };
+
+    if daemon_addr.starts_with("unix://") {
+        let socket_path = daemon_addr.strip_prefix("unix://").unwrap();
+        bollard::Docker::connect_with_socket(socket_path, 120, &client_version)
+            .map_err(|e| format!("Could not connect to docker daemon via socket: {}", e))
+    } else {
+        bollard::Docker::connect_with_http(daemon_addr, 120, &client_version)
+            .map_err(|e| format!("Could not connect to docker daemon via http: {}", e))
+    }
+}
+
 pub struct DockerEnv {
     docker: bollard::Docker,
     container_id: String,
@@ -29,16 +46,7 @@ impl DockerEnv {
         registry: Option<String>,
         params: EnvironmentParams,
     ) -> Self {
-        let docker = bollard::Docker::connect_with_http(
-            &machine.daemon_addr,
-            120,
-            &bollard::ClientVersion {
-                minor_version: 1,
-                major_version: 44,
-            },
-        )
-        .map_err(|e| format!("Could not connect to docker daemon: {}", e))
-        .unwrap();
+        let docker = connect_to_docker(&machine.daemon_addr).unwrap();
 
         let cpuset_cpus = machine
             .cores
