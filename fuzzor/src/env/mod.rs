@@ -26,6 +26,8 @@ pub trait Environment {
     async fn get_covered_files(&self) -> Result<Vec<String>, String>;
     /// Get the coverage report
     async fn get_coverage_report(&self) -> Result<Vec<u8>, String>;
+    /// Get the raw coverage summary (coverage-summary.json)
+    async fn get_coverage_summary(&self) -> Result<Vec<u8>, String>;
     /// Upload an initial corpus to the environment
     async fn upload_initial_corpus(&self, corpus: Vec<u8>) -> Result<(), String>;
     /// Start fuzzing in the environment

@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use crate::solutions::{ondisk::OnDiskSolutionTracker, SolutionTracker};
 
+use chrono::Utc;
 use fuzzor_infra::FuzzerStats;
 use tokio::{
     fs::{File, OpenOptions},
@@ -23,8 +24,10 @@ pub trait HarnessState {
     async fn covers_file(&self, file: String) -> bool;
     /// Store a coverage report
     async fn store_coverage_report(&self, tar: Vec<u8>);
-    /// Record stats
-    async fn record_stats(&mut self, stats: FuzzerStats);
+    /// Store a coverage summary for a campaign
+    async fn store_coverage_summary(&self, campaign_id: &str, summary: Vec<u8>);
+    /// Record stats for a campaign
+    async fn record_stats(&mut self, campaign_id: &str, stats: FuzzerStats);
 }
 
 pub struct Harness {
@@ -58,7 +61,7 @@ pub struct PersistentHarnessState {
     covered_files: HashSet<String>,
     solutions: Arc<Mutex<dyn SolutionTracker + Send>>,
     path: PathBuf,
-    stats_file: File,
+    campaign_stats_files: HashMap<String, File>,
 }
 
 impl PersistentHarnessState {
@@ -76,13 +79,6 @@ impl PersistentHarnessState {
             }
         }
 
-        let stats_file = OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(path.join("stats.txt"))
-            .await
-            .unwrap();
-
         let solution_tracker = OnDiskSolutionTracker::new(path.join("solutions/"))
             .await
             .unwrap();
@@ -91,8 +87,12 @@ impl PersistentHarnessState {
             solutions: Arc::new(Mutex::new(solution_tracker)),
             covered_files,
             path,
-            stats_file,
+            campaign_stats_files: HashMap::new(),
         }
+    }
+
+    fn campaign_dir(&self, campaign_id: &str) -> PathBuf {
+        self.path.join("campaigns").join(campaign_id)
     }
 }
 
@@ -151,13 +151,39 @@ impl HarnessState for PersistentHarnessState {
         }
     }
 
-    async fn record_stats(&mut self, stats: FuzzerStats) {
-        if let Err(err) = self
-            .stats_file
+    async fn store_coverage_summary(&self, campaign_id: &str, summary: Vec<u8>) {
+        let campaign_dir = self.campaign_dir(campaign_id);
+        let _ = tokio::fs::create_dir_all(&campaign_dir).await;
+
+        let summary_path = campaign_dir.join("coverage-summary.json");
+        if let Err(err) = tokio::fs::write(&summary_path, &summary).await {
+            log::error!("Could not write coverage summary to {:?}: {:?}", summary_path, err);
+        }
+    }
+
+    async fn record_stats(&mut self, campaign_id: &str, stats: FuzzerStats) {
+        let campaign_dir = self.campaign_dir(campaign_id);
+
+        if !self.campaign_stats_files.contains_key(campaign_id) {
+            let _ = tokio::fs::create_dir_all(&campaign_dir).await;
+
+            let stats_file = OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(campaign_dir.join("stats.txt"))
+                .await
+                .unwrap();
+            self.campaign_stats_files
+                .insert(campaign_id.to_string(), stats_file);
+        }
+
+        let stats_file = self.campaign_stats_files.get_mut(campaign_id).unwrap();
+        let timestamp = Utc::now().format("%Y-%m-%dT%H:%M:%SZ");
+        if let Err(err) = stats_file
             .write_all(
                 format!(
-                    "{:?},{},{}\n",
-                    stats.stability, stats.execs_per_sec, stats.corpus_count
+                    "{},{:?},{},{}\n",
+                    timestamp, stats.stability, stats.execs_per_sec, stats.corpus_count
                 )
                 .as_bytes(),
             )
@@ -166,6 +192,6 @@ impl HarnessState for PersistentHarnessState {
             log::error!("Could not write to stats file: {:?}", err);
         }
 
-        let _ = self.stats_file.flush().await;
+        let _ = stats_file.flush().await;
     }
 }

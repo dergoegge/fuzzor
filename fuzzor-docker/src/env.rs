@@ -417,6 +417,30 @@ impl Environment for DockerEnv {
             .await
     }
 
+    async fn get_coverage_summary(&self) -> Result<Vec<u8>, String> {
+        let tar_bytes = self
+            .download_tar(String::from("/workdir/coverage-summary.json"))
+            .await?;
+
+        let mut tarball = tar::Archive::new(tar_bytes.as_slice());
+
+        if let Some(entry) = tarball
+            .entries()
+            .map_err(|e| format!("Could not get entries from coverage summary tarball: {}", e))?
+            .next()
+        {
+            let mut summary = Vec::new();
+            entry
+                .map_err(|e| format!("Entry was not Ok: {}", e))?
+                .read_to_end(&mut summary)
+                .map_err(|e| format!("Could not read coverage summary: {}", e))?;
+
+            return Ok(summary);
+        }
+
+        Err(String::from("No entries in downloaded tar"))
+    }
+
     async fn upload_initial_corpus(&self, corpus: Vec<u8>) -> Result<(), String> {
         let options = Some(bollard::container::UploadToContainerOptions {
             path: "/workdir/workspace/corpus",

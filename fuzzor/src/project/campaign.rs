@@ -166,8 +166,12 @@ where
         let found_solutions = total_solutions > 0;
 
         {
+            let campaign_id = self.env.get_id().await;
             let mut harness = self.harness.lock().await;
-            harness.state_mut().record_stats(stats.clone()).await;
+            harness
+                .state_mut()
+                .record_stats(&campaign_id, stats.clone())
+                .await;
         }
 
         if self
@@ -369,6 +373,18 @@ where
                         harness.state_mut().store_coverage_report(report).await;
                     }
                     Err(err) => log::warn!("Could not fetch coverage report from env: {:?}", err),
+                }
+
+                match self.env.get_coverage_summary().await {
+                    Ok(summary) => {
+                        let campaign_id = self.env.get_id().await;
+                        let harness = self.harness.lock().await;
+                        harness
+                            .state()
+                            .store_coverage_summary(&campaign_id, summary)
+                            .await;
+                    }
+                    Err(err) => log::warn!("Could not fetch coverage summary from env: {:?}", err),
                 }
             }
 

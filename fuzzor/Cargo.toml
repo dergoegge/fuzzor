@@ -22,3 +22,4 @@ tokio = { version = "1.37", features = ["full"] }
 fuzzor_infra = { path = "../infra/types", package = "types", version = "0.1.0"}
 git2 = "0.18.3"
 async-trait = "0.1.80"
+chrono = "0.4"
