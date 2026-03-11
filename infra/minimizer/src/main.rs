@@ -106,7 +106,7 @@ async fn minimize_with_libfuzzer(
             "-set_cover_merge=1",
             "-shuffle=0",
             "-prefer_small=1",
-            "-use_value_profile=0",
+            "-use_value_profile=1",
             output.to_str().unwrap(),
             input.to_str().unwrap(),
         ])
