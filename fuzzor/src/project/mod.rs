@@ -23,12 +23,9 @@ use scheduler::{CampaignScheduler, CampaignSchedulerInput};
 use state::State;
 
 use fuzzor_infra::ProjectConfig;
-use tokio::{
-    sync::{
-        mpsc::{Receiver, Sender},
-        Mutex,
-    },
-    time::{timeout, Duration},
+use tokio::sync::{
+    mpsc::{Receiver, Sender},
+    Mutex,
 };
 
 #[derive(Debug)]
@@ -372,12 +369,12 @@ where
             }
         }
 
-        log::info!("Quiting project '{}'", self.config.name);
+        log::info!("Quitting project '{}'", self.config.name);
 
         // Quit the campaign scheduler task.
         self.wake_up_scheduler = None;
-        // Scheduler might be stuck waiting for an env, give it 10 seconds then just bail.
-        let _ = timeout(Duration::from_secs(10), scheduler_task).await;
+        scheduler_task.abort();
+        let _ = scheduler_task.await;
 
         // Quit all active campaigns.
         for (_, (campaign_handle, quit)) in self.campaigns.drain() {
@@ -500,7 +497,7 @@ where
         loop {
             if eager_scheduling {
                 log::trace!(
-                    "Attempting to eagerly scheduling the next campaign for project '{}'",
+                    "Attempting to eagerly schedule the next campaign for project '{}'",
                     self.project_config.name
                 );
             }
