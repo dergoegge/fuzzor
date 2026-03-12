@@ -26,6 +26,8 @@ pub trait Environment {
     async fn get_corpus(&self, minimize: bool) -> Result<Vec<u8>, String>;
     /// Get the names of the source files that were covered through fuzzing
     async fn get_covered_files(&self) -> Result<Vec<String>, String>;
+    /// Get the names of the functions that were covered through fuzzing
+    async fn get_covered_functions(&self) -> Result<Vec<String>, String>;
     /// Get the coverage report
     async fn get_coverage_report(&self) -> Result<Vec<u8>, String>;
     /// Get the raw coverage summary (coverage-summary.json)

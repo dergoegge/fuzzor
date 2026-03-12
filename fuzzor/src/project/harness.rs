@@ -22,6 +22,12 @@ pub trait HarnessState {
     async fn covered_files(&self) -> HashSet<String>;
     /// Check if a file is reachable by the harness through fuzzing
     async fn covers_file(&self, file: String) -> bool;
+    /// Store the function names that the harness can reach through fuzzing
+    async fn set_covered_functions(&mut self, covered_functions: Vec<String>);
+    /// Get the function names that the harness can reach through fuzzing
+    async fn covered_functions(&self) -> HashSet<String>;
+    /// Check if a function is reachable by the harness through fuzzing
+    async fn covers_function(&self, function: String) -> bool;
     /// Store a coverage report
     async fn store_coverage_report(&self, tar: Vec<u8>);
     /// Store a coverage summary for a campaign
@@ -61,6 +67,7 @@ pub type SharedHarnessMap = Arc<Mutex<HarnessMap>>;
 
 pub struct PersistentHarnessState {
     covered_files: HashSet<String>,
+    covered_functions: HashSet<String>,
     solutions: Arc<Mutex<dyn SolutionTracker + Send>>,
     path: PathBuf,
     campaign_stats_files: HashMap<String, File>,
@@ -69,6 +76,7 @@ pub struct PersistentHarnessState {
 impl PersistentHarnessState {
     pub async fn new(path: PathBuf) -> Self {
         let mut covered_files = HashSet::new();
+        let mut covered_functions = HashSet::new();
 
         let _ = tokio::fs::create_dir_all(&path).await;
 
@@ -81,6 +89,15 @@ impl PersistentHarnessState {
             }
         }
 
+        if let Ok(file) = File::open(path.join("covered_functions.txt")).await {
+            let reader = BufReader::new(file);
+
+            let mut lines = reader.lines();
+            while let Some(line) = lines.next_line().await.unwrap() {
+                covered_functions.insert(line.to_string());
+            }
+        }
+
         let solution_tracker = OnDiskSolutionTracker::new(path.join("solutions/"))
             .await
             .unwrap();
@@ -88,6 +105,7 @@ impl PersistentHarnessState {
         Self {
             solutions: Arc::new(Mutex::new(solution_tracker)),
             covered_files,
+            covered_functions,
             path,
             campaign_stats_files: HashMap::new(),
         }
@@ -128,6 +146,39 @@ impl HarnessState for PersistentHarnessState {
     async fn covers_file(&self, file: String) -> bool {
         for covered_file in self.covered_files.iter() {
             if covered_file.ends_with(&file) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    async fn set_covered_functions(&mut self, mut covered_functions: Vec<String>) {
+        let _ = tokio::fs::create_dir_all(&self.path).await;
+
+        if let Ok(file) = File::create(self.path.join("covered_functions.txt")).await {
+            let mut writer = BufWriter::new(file);
+
+            for covered_function in covered_functions.iter() {
+                let line = format!("{}\n", covered_function);
+                writer.write_all(line.as_bytes()).await.unwrap();
+            }
+
+            writer.flush().await.unwrap();
+        } else {
+            log::error!("Could not save covered functions: {:?}", self.path);
+        }
+
+        self.covered_functions = HashSet::from_iter(covered_functions.drain(..));
+    }
+
+    async fn covered_functions(&self) -> HashSet<String> {
+        self.covered_functions.clone()
+    }
+
+    async fn covers_function(&self, function: String) -> bool {
+        for covered_function in self.covered_functions.iter() {
+            if covered_function.ends_with(&function) {
                 return true;
             }
         }

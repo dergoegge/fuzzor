@@ -394,6 +394,26 @@ where
                     Err(err) => log::warn!("Could not fetch covered files from env: {:?}", err),
                 }
 
+                match self.env.get_covered_functions().await {
+                    Ok(covered_functions) => {
+                        let mut harness = self.harness.lock().await;
+
+                        log::trace!(
+                            "Covered functions for harness '{}': {} functions",
+                            harness.name(),
+                            covered_functions.len()
+                        );
+
+                        harness
+                            .state_mut()
+                            .set_covered_functions(covered_functions)
+                            .await;
+                    }
+                    Err(err) => {
+                        log::warn!("Could not fetch covered functions from env: {:?}", err)
+                    }
+                }
+
                 match self.env.get_coverage_report().await {
                     Ok(report) => {
                         let mut harness = self.harness.lock().await;

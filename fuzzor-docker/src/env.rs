@@ -418,6 +418,36 @@ impl Environment for DockerEnv {
         Err(String::from("No entries in downloaded tar"))
     }
 
+    async fn get_covered_functions(&self) -> Result<Vec<String>, String> {
+        let tar_bytes = self
+            .download_tar(String::from("/workdir/covered-functions.txt"))
+            .await?;
+
+        let mut tarball = tar::Archive::new(tar_bytes.as_slice());
+
+        if let Some(entry) = tarball
+            .entries()
+            .map_err(|e| format!("Could not get entries from covered functions tarball: {}", e))?
+            .next()
+        {
+            let mut contents = String::new();
+            entry
+                .map_err(|e| format!("Entry was not Ok: {}", e))?
+                .read_to_string(&mut contents)
+                .map_err(|e| format!("Could not read covered functions to string: {}", e))?;
+
+            let function_names: Vec<String> = contents
+                .lines()
+                .filter(|l| !l.is_empty())
+                .map(|l| l.to_string())
+                .collect();
+
+            return Ok(function_names);
+        }
+
+        Err(String::from("No entries in downloaded tar"))
+    }
+
     async fn get_coverage_report(&self) -> Result<Vec<u8>, String> {
         self.download_tar(String::from("/workdir/coverage_report"))
             .await

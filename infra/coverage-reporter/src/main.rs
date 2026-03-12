@@ -7,6 +7,7 @@ use fuzzor_infra::{get_harness_binary, FuzzEngine, Language, ProjectConfig, Sani
 const PROFRAW_FILE: &str = "default.profraw";
 const PROFDATA_FILE: &str = "default.profdata";
 const COVERAGE_SUMMARY_FILE: &str = "coverage-summary.json";
+const COVERED_FUNCTIONS_FILE: &str = "/workdir/covered-functions.txt";
 const COVERAGE_REPORT_DIR: &str = "/workdir/coverage_report";
 
 #[derive(Parser, Debug)]
@@ -94,6 +95,50 @@ impl CoverageReporter {
         Ok(())
     }
 
+    async fn export_covered_functions(&self) -> io::Result<()> {
+        let mut cmd = Command::new("llvm-cov");
+        cmd.args([
+            "export",
+            self.binary_path.to_str().unwrap(),
+            &format!("-instr-profile={}", PROFDATA_FILE),
+        ]);
+
+        if let Some(demangler) = &self.demangler {
+            cmd.arg(format!("-Xdemangler={}", demangler));
+        }
+
+        let output = cmd.kill_on_drop(true).output().await?;
+
+        if !output.status.success() {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Failed to export full coverage data",
+            ));
+        }
+
+        let json: serde_json::Value = serde_json::from_slice(&output.stdout)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+        let mut function_names = Vec::new();
+        if let Some(functions) = json["data"][0]["functions"].as_array() {
+            for func in functions {
+                if func["count"].as_i64().unwrap_or(0) > 0 {
+                    if let Some(name) = func["name"].as_str() {
+                        function_names.push(name.to_string());
+                    }
+                }
+            }
+        }
+
+        function_names.sort();
+        function_names.dedup();
+
+        let contents = function_names.join("\n");
+        tokio::fs::write(COVERED_FUNCTIONS_FILE, contents).await?;
+
+        Ok(())
+    }
+
     async fn generate_html_report(&self) -> io::Result<()> {
         let mut cmd = Command::new("llvm-cov");
         cmd.args([
@@ -143,6 +188,7 @@ async fn main() -> io::Result<()> {
     reporter.run_coverage_binary(&opts.corpus).await?;
     reporter.merge_profdata().await?;
     reporter.export_coverage_summary().await?;
+    reporter.export_covered_functions().await?;
     reporter.generate_html_report().await?;
 
     Ok(())
