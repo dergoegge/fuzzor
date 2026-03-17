@@ -323,6 +323,10 @@ impl Environment for DockerEnv {
         self.container_id.clone()
     }
 
+    async fn get_num_cpus(&self) -> usize {
+        self.machine.cores.len()
+    }
+
     async fn get_stats(&self) -> Result<FuzzerStats, String> {
         let stats_tar = self
             .download_tar(format!("{}/stats.yaml", ENSEMBLE_DIR))

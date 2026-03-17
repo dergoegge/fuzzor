@@ -168,6 +168,21 @@ impl ReproducedSolution {
     }
 }
 
+/// Startup parameters for a fuzzing campaign, stored once at the beginning of each campaign.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CampaignStartupParams {
+    /// Number of CPUs allocated to the campaign
+    pub num_cpus: usize,
+    /// Campaign duration in seconds
+    pub duration_secs: u64,
+    /// Fuzzing engines enabled for the campaign
+    pub engines: Option<Vec<FuzzEngine>>,
+    /// Sanitizers enabled for the campaign
+    pub sanitizers: Option<Vec<Sanitizer>>,
+    /// Commit hash of the target binary being fuzzed
+    pub commit_hash: String,
+}
+
 pub fn format_image_name(config: &ProjectConfig) -> String {
     format!("fuzzor-{}", &config.name)
 }
