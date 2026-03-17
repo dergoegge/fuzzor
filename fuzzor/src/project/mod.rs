@@ -183,6 +183,7 @@ where
             .sync_schedule(CampaignSchedulerInput {
                 harnesses: self.harnesses.clone(),
                 modified_files: build.revision().modified_files().to_vec(),
+                commit_hash: build.revision().commit_hash().to_string(),
             })
             .await;
         // Wake up the scheduler task to see if there is a campaign to schedule.
@@ -553,6 +554,8 @@ where
             );
 
             let harness_name = env_params.harness_name.clone();
+            let commit_hash = env_params.commit_hash.clone();
+            let duration = env_params.duration;
 
             let env = match self.env_allocator.alloc(env_params).await {
                 Ok(env) => env,
@@ -587,7 +590,9 @@ where
             // Run the campaign in a separate task.
             let project_config = self.project_config.clone();
             let campaign_task = tokio::spawn(async move {
-                let mut campaign = Campaign::new(project_config, harness, env, event_sender).await;
+                let mut campaign =
+                    Campaign::new(project_config, harness, env, event_sender, commit_hash, duration)
+                        .await;
                 campaign.run(quit_rx).await;
                 campaign
             });

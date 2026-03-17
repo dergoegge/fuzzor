@@ -13,6 +13,8 @@ use tokio::sync::{Mutex, Semaphore};
 pub trait Environment {
     /// Get environment identifier
     async fn get_id(&self) -> String;
+    /// Get the number of CPUs allocated to this environment
+    async fn get_num_cpus(&self) -> usize;
     /// Get fuzzer stats, aggregated over all fuzz instances that are running as part of the active
     /// campaign.
     async fn get_stats(&self) -> Result<FuzzerStats, String>;
@@ -50,6 +52,8 @@ pub struct EnvironmentParams {
     pub duration: Duration,
     /// Config of the owning project
     pub project_config: ProjectConfig,
+    /// Commit hash of the target binary being fuzzed
+    pub commit_hash: String,
 }
 
 /// EnvironmentAllocator allocation of environments for fuzzing campaigns.

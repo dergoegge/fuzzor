@@ -1,9 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::{env::*, project::harness::*, solutions::*};
 
-use fuzzor_infra::{FuzzerStats, ProjectConfig, Sanitizer};
+use fuzzor_infra::{CampaignStartupParams, FuzzerStats, ProjectConfig, Sanitizer};
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     Mutex,
@@ -50,6 +51,10 @@ pub struct Campaign<E> {
     last_reported_stats: Option<FuzzerStats>,
     // Name of the project managing this campaign
     project_config: ProjectConfig,
+    // Commit hash of the target binary being fuzzed
+    commit_hash: String,
+    // Duration of the campaign
+    duration: Duration,
 }
 
 impl<E> Campaign<E>
@@ -61,6 +66,8 @@ where
         harness: Arc<Mutex<Harness>>,
         env: E,
         event_sender: Sender<CampaignEvent>,
+        commit_hash: String,
+        duration: Duration,
     ) -> Self {
         let harness_name = harness.lock().await.name().to_string();
 
@@ -79,6 +86,8 @@ where
             event_sender,
             last_reported_stats: None,
             project_config,
+            commit_hash,
+            duration,
         }
     }
 
@@ -241,6 +250,23 @@ where
             .await;
 
         let _ = self.env.start().await;
+
+        // Store startup parameters for this campaign.
+        let campaign_id = self.env.get_id().await;
+        let startup_params = CampaignStartupParams {
+            num_cpus: self.env.get_num_cpus().await,
+            duration_secs: self.duration.as_secs(),
+            engines: self.project_config.engines.clone(),
+            sanitizers: self.project_config.sanitizers.clone(),
+            commit_hash: self.commit_hash.clone(),
+        };
+        {
+            let harness = self.harness.lock().await;
+            harness
+                .state()
+                .store_startup_params(&campaign_id, startup_params)
+                .await;
+        }
 
         let mut quit = false;
         let mut kill = false; // kill: end the campaign without sending a quit event

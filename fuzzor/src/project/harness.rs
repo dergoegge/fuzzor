@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::solutions::{ondisk::OnDiskSolutionTracker, SolutionTracker};
 
 use chrono::Utc;
-use fuzzor_infra::FuzzerStats;
+use fuzzor_infra::{CampaignStartupParams, FuzzerStats};
 use tokio::{
     fs::{File, OpenOptions},
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
@@ -26,6 +26,8 @@ pub trait HarnessState {
     async fn store_coverage_report(&self, tar: Vec<u8>);
     /// Store a coverage summary for a campaign
     async fn store_coverage_summary(&self, campaign_id: &str, summary: Vec<u8>);
+    /// Store startup parameters for a campaign
+    async fn store_startup_params(&self, campaign_id: &str, params: CampaignStartupParams);
     /// Record stats for a campaign
     async fn record_stats(&mut self, campaign_id: &str, stats: FuzzerStats);
 }
@@ -161,6 +163,27 @@ impl HarnessState for PersistentHarnessState {
         }
     }
 
+    async fn store_startup_params(&self, campaign_id: &str, params: CampaignStartupParams) {
+        let campaign_dir = self.campaign_dir(campaign_id);
+        let _ = tokio::fs::create_dir_all(&campaign_dir).await;
+
+        let params_path = campaign_dir.join("startup_params.json");
+        match serde_json::to_vec_pretty(&params) {
+            Ok(json) => {
+                if let Err(err) = tokio::fs::write(&params_path, &json).await {
+                    log::error!(
+                        "Could not write startup params to {:?}: {:?}",
+                        params_path,
+                        err
+                    );
+                }
+            }
+            Err(err) => {
+                log::error!("Could not serialize startup params: {:?}", err);
+            }
+        }
+    }
+
     async fn record_stats(&mut self, campaign_id: &str, stats: FuzzerStats) {
         let campaign_dir = self.campaign_dir(campaign_id);
 
@@ -193,5 +216,42 @@ impl HarnessState for PersistentHarnessState {
         }
 
         let _ = stats_file.flush().await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fuzzor_infra::{CampaignStartupParams, FuzzEngine, Sanitizer};
+
+    #[tokio::test]
+    async fn store_startup_params_creates_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = PersistentHarnessState::new(dir.path().to_path_buf()).await;
+
+        let params = CampaignStartupParams {
+            num_cpus: 4,
+            duration_secs: 3600,
+            engines: Some(vec![FuzzEngine::LibFuzzer, FuzzEngine::AflPlusPlus]),
+            sanitizers: Some(vec![Sanitizer::Address, Sanitizer::Undefined]),
+            commit_hash: "abc123def456".to_string(),
+        };
+
+        state
+            .store_startup_params("campaign-001", params.clone())
+            .await;
+
+        let params_path = dir
+            .path()
+            .join("campaigns")
+            .join("campaign-001")
+            .join("startup_params.json");
+        assert!(params_path.exists(), "startup_params.json should be created");
+
+        let content = tokio::fs::read_to_string(&params_path).await.unwrap();
+        let loaded: CampaignStartupParams = serde_json::from_str(&content).unwrap();
+        assert_eq!(loaded.num_cpus, 4);
+        assert_eq!(loaded.duration_secs, 3600);
+        assert_eq!(loaded.commit_hash, "abc123def456");
     }
 }

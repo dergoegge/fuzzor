@@ -11,6 +11,7 @@ use rand::{seq::SliceRandom, thread_rng};
 pub struct CampaignSchedulerInput {
     pub harnesses: SharedHarnessMap,
     pub modified_files: Vec<String>,
+    pub commit_hash: String,
 }
 
 /// CampaignScheduler defines how fuzzing campaigns are scheduled.
@@ -38,6 +39,8 @@ pub struct RoundRobinCampaignScheduler {
     project_config: ProjectConfig,
     // Set of harness names that are active
     unfinished: HashSet<String>,
+    // Commit hash of the current build being fuzzed
+    commit_hash: String,
 }
 
 unsafe impl Send for RoundRobinCampaignScheduler {}
@@ -50,6 +53,7 @@ impl RoundRobinCampaignScheduler {
             duration,
             unfinished: HashSet::new(),
             project_config,
+            commit_hash: String::new(),
         }
     }
 }
@@ -74,6 +78,7 @@ impl CampaignScheduler for RoundRobinCampaignScheduler {
             harness_name,
             duration: self.duration,
             project_config: self.project_config.clone(),
+            commit_hash: self.commit_hash.clone(),
         })
     }
 
@@ -86,6 +91,7 @@ impl CampaignScheduler for RoundRobinCampaignScheduler {
         self.current_schedule.shuffle(&mut thread_rng());
 
         self.next_harness = 0;
+        self.commit_hash = input.commit_hash;
 
         log::trace!("Synced schedule {}", self.current_schedule.len());
     }
@@ -115,6 +121,8 @@ pub struct CoverageBasedScheduler {
     project_config: ProjectConfig,
 
     rr_scheduler: Option<RoundRobinCampaignScheduler>,
+    // Commit hash of the current build being fuzzed
+    commit_hash: String,
 }
 
 impl CoverageBasedScheduler {
@@ -129,6 +137,7 @@ impl CoverageBasedScheduler {
             duration,
             project_config,
             rr_scheduler: None,
+            commit_hash: String::new(),
         }
     }
 
@@ -145,6 +154,7 @@ impl CoverageBasedScheduler {
             )),
 
             project_config,
+            commit_hash: String::new(),
         }
     }
 }
@@ -159,6 +169,7 @@ impl CampaignScheduler for CoverageBasedScheduler {
                 harness_name,
                 duration: self.duration,
                 project_config: self.project_config.clone(),
+                commit_hash: self.commit_hash.clone(),
             }),
             None => {
                 if let Some(rr) = self.rr_scheduler.as_mut() {
@@ -171,6 +182,7 @@ impl CampaignScheduler for CoverageBasedScheduler {
     }
 
     async fn sync_schedule(&mut self, input: CampaignSchedulerInput) {
+        self.commit_hash = input.commit_hash.clone();
         if let Some(rr) = self.rr_scheduler.as_mut() {
             rr.sync_schedule(input.clone()).await;
         }
@@ -273,6 +285,8 @@ pub struct OneShotScheduler {
 
     duration: Duration,
     project_config: ProjectConfig,
+    // Commit hash of the current build being fuzzed
+    commit_hash: String,
 }
 
 impl OneShotScheduler {
@@ -282,6 +296,7 @@ impl OneShotScheduler {
             schedule: VecDeque::new(),
             duration,
             project_config,
+            commit_hash: String::new(),
         }
     }
 }
@@ -296,12 +311,14 @@ impl CampaignScheduler for OneShotScheduler {
                 harness_name,
                 duration: self.duration,
                 project_config: self.project_config.clone(),
+                commit_hash: self.commit_hash.clone(),
             }),
             None => Err("Nothing in the current schedule"),
         }
     }
 
     async fn sync_schedule(&mut self, input: CampaignSchedulerInput) {
+        self.commit_hash = input.commit_hash.clone();
         let harnesses = input.harnesses.lock().await;
 
         self.schedule.clear();
