@@ -192,9 +192,21 @@ impl Fuzzer for AflppFuzzer {
 
         self.env
             .insert(String::from("AFL_NO_UI"), String::from("1"));
+        if std::env::var("FUZZOR_AFL_DEBUG").is_ok() {
+            self.env
+                .insert(String::from("AFL_DEBUG_CHILD"), String::from("1"));
+        }
         command.envs(&self.env);
+
         command.stdout(Stdio::null());
-        command.stderr(Stdio::null());
+        if std::env::var("FUZZOR_AFL_DEBUG").is_ok() {
+            let log_path = self.workspace.join(format!("aflpp_instance_{}.log", self.id));
+            let log_file =
+                std::fs::File::create(&log_path).expect("Could not create AFL++ log file");
+            command.stderr(Stdio::from(log_file));
+        } else {
+            command.stderr(Stdio::null());
+        }
 
         let host_env: HashMap<String, String> = std::env::vars().collect();
         command.envs(host_env);

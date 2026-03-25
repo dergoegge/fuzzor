@@ -141,8 +141,15 @@ impl DockerEnv {
             ..Default::default()
         };
 
+        let mut container_env = Vec::new();
         if let Some(env) = params.project_config.fuzz_env_var.as_ref() {
-            config.env = Some(vec![format!("{}={}", env, params.harness_name)]);
+            container_env.push(format!("{}={}", env, params.harness_name));
+        }
+        if std::env::var("FUZZOR_AFL_DEBUG").is_ok() {
+            container_env.push(String::from("FUZZOR_AFL_DEBUG=1"));
+        }
+        if !container_env.is_empty() {
+            config.env = Some(container_env);
         }
 
         let container_id = docker
