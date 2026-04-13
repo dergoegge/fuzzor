@@ -96,15 +96,18 @@ impl CoverageReporter {
     }
 
     async fn export_covered_functions(&self) -> io::Result<()> {
-        let output = Command::new("llvm-cov")
-            .args([
-                "export",
-                self.binary_path.to_str().unwrap(),
-                &format!("-instr-profile={}", PROFDATA_FILE),
-            ])
-            .kill_on_drop(true)
-            .output()
-            .await?;
+        let mut cmd = Command::new("llvm-cov");
+        cmd.args([
+            "export",
+            self.binary_path.to_str().unwrap(),
+            &format!("-instr-profile={}", PROFDATA_FILE),
+        ]);
+
+        if let Some(demangler) = &self.demangler {
+            cmd.arg(format!("-Xdemangler={}", demangler));
+        }
+
+        let output = cmd.kill_on_drop(true).output().await?;
 
         if !output.status.success() {
             return Err(io::Error::new(
@@ -127,10 +130,6 @@ impl CoverageReporter {
             }
         }
 
-        if let Some(demangler) = &self.demangler {
-            function_names = self.demangle_names(demangler, function_names).await?;
-        }
-
         function_names.sort();
         function_names.dedup();
 
@@ -138,38 +137,6 @@ impl CoverageReporter {
         tokio::fs::write(COVERED_FUNCTIONS_FILE, contents).await?;
 
         Ok(())
-    }
-
-    async fn demangle_names(
-        &self,
-        demangler: &str,
-        names: Vec<String>,
-    ) -> io::Result<Vec<String>> {
-        use tokio::io::AsyncWriteExt;
-
-        let mut child = Command::new(demangler)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .kill_on_drop(true)
-            .spawn()?;
-
-        let mut stdin = child.stdin.take().unwrap();
-        let input = names.join("\n");
-        stdin.write_all(input.as_bytes()).await?;
-        drop(stdin);
-
-        let output = child.wait_with_output().await?;
-        if !output.status.success() {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("Demangler '{}' failed", demangler),
-            ));
-        }
-
-        let demangled = String::from_utf8(output.stdout)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-
-        Ok(demangled.lines().map(|l| l.to_string()).collect())
     }
 
     async fn generate_html_report(&self) -> io::Result<()> {
