@@ -16,6 +16,7 @@ serde_yaml = "0.9.32"
 tokio = { version = "1.37", features = ["full"] }
 clap = { version = "4.5.4", features = ["derive", "string"] }
 fuzzor_infra = { path = "../types", package = "types", version = "0.1.0"}
+cpp_demangle = "0.5.1"
 
 [[bin]]
 name = "coverage-reporter"

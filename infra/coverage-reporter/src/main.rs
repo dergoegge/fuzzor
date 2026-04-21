@@ -1,8 +1,9 @@
 use clap::Parser;
+use cpp_demangle::Symbol;
 use std::{io, path::PathBuf};
 use tokio::process::Command;
 
-use fuzzor_infra::{get_harness_binary, FuzzEngine, Language, ProjectConfig, Sanitizer};
+use fuzzor_infra::{get_harness_binary, FuzzEngine, ProjectConfig, Sanitizer};
 
 const PROFRAW_FILE: &str = "default.profraw";
 const PROFDATA_FILE: &str = "default.profdata";
@@ -20,22 +21,32 @@ struct Options {
     pub harness: String,
 }
 
+fn demangle_name(mangled: &str) -> String {
+    // llvm-cov prefixes internal-linkage symbols with "<file>:_Z...", which
+    // cpp_demangle can't parse. Strip the prefix and re-attach it after.
+    let (prefix, raw) = match mangled.split_once(':') {
+        Some((p, r)) if r.starts_with("_Z") => (Some(p), r),
+        _ => (None, mangled),
+    };
+
+    let demangled = Symbol::new(raw.as_bytes())
+        .ok()
+        .and_then(|s| s.demangle().ok())
+        .unwrap_or_else(|| raw.to_string());
+
+    match prefix {
+        Some(p) => format!("{}:{}", p, demangled),
+        None => demangled,
+    }
+}
+
 struct CoverageReporter {
     binary_path: PathBuf,
-    demangler: Option<String>,
 }
 
 impl CoverageReporter {
-    fn new(binary_path: PathBuf, language: &Language) -> Self {
-        let demangler = match language {
-            Language::Rust => Some("rustfilt".to_string()),
-            Language::Cpp => Some("c++filt".to_string()),
-            _ => None,
-        };
-        Self {
-            binary_path,
-            demangler,
-        }
+    fn new(binary_path: PathBuf) -> Self {
+        Self { binary_path }
     }
 
     async fn run_coverage_binary(&self, corpus_path: &str) -> io::Result<()> {
@@ -96,18 +107,15 @@ impl CoverageReporter {
     }
 
     async fn export_covered_functions(&self) -> io::Result<()> {
-        let mut cmd = Command::new("llvm-cov");
-        cmd.args([
-            "export",
-            self.binary_path.to_str().unwrap(),
-            &format!("-instr-profile={}", PROFDATA_FILE),
-        ]);
-
-        if let Some(demangler) = &self.demangler {
-            cmd.arg(format!("-Xdemangler={}", demangler));
-        }
-
-        let output = cmd.kill_on_drop(true).output().await?;
+        let output = Command::new("llvm-cov")
+            .args([
+                "export",
+                self.binary_path.to_str().unwrap(),
+                &format!("-instr-profile={}", PROFDATA_FILE),
+            ])
+            .kill_on_drop(true)
+            .output()
+            .await?;
 
         if !output.status.success() {
             return Err(io::Error::new(
@@ -124,7 +132,7 @@ impl CoverageReporter {
             for func in functions {
                 if func["count"].as_i64().unwrap_or(0) > 0 {
                     if let Some(name) = func["name"].as_str() {
-                        function_names.push(name.to_string());
+                        function_names.push(demangle_name(name));
                     }
                 }
             }
@@ -140,22 +148,19 @@ impl CoverageReporter {
     }
 
     async fn generate_html_report(&self) -> io::Result<()> {
-        let mut cmd = Command::new("llvm-cov");
-        cmd.args([
-            "show",
-            self.binary_path.to_str().unwrap(),
-            &format!("-instr-profile={}", PROFDATA_FILE),
-            "-format=html",
-            "-show-directory-coverage",
-            "-show-branches=count",
-            &format!("-output-dir={}", COVERAGE_REPORT_DIR),
-        ]);
-
-        if let Some(demangler) = &self.demangler {
-            cmd.arg(format!("-Xdemangler={}", demangler));
-        }
-
-        let status = cmd.kill_on_drop(true).status().await?;
+        let status = Command::new("llvm-cov")
+            .args([
+                "show",
+                self.binary_path.to_str().unwrap(),
+                &format!("-instr-profile={}", PROFDATA_FILE),
+                "-format=html",
+                "-show-directory-coverage",
+                "-show-branches=count",
+                &format!("-output-dir={}", COVERAGE_REPORT_DIR),
+            ])
+            .kill_on_drop(true)
+            .status()
+            .await?;
 
         if !status.success() {
             return Err(io::Error::new(
@@ -183,7 +188,7 @@ async fn main() -> io::Result<()> {
     )
     .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Failed to get harness binary"))?;
 
-    let reporter = CoverageReporter::new(coverage_bin, &config.language);
+    let reporter = CoverageReporter::new(coverage_bin);
 
     reporter.run_coverage_binary(&opts.corpus).await?;
     reporter.merge_profdata().await?;
