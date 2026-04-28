@@ -110,8 +110,13 @@ impl DockerEnv {
         }
 
         let mut resource_limits = Vec::new();
-        if std::env::var("FUZZOR_DOCKER_NO_STACK_LIMIT").is_err() {
-            // Limit the stack size in the env unless FUZZOR_DOCKER_NO_STACK_LIMIT is set.
+        // Limit the stack size in the env unless FUZZOR_DOCKER_NO_STACK_LIMIT is set or
+        // the harness is opted out via the project config.
+        if std::env::var("FUZZOR_DOCKER_NO_STACK_LIMIT").is_err()
+            && !params
+                .project_config
+                .harness_has_no_stack_limit(&params.harness_name)
+        {
             resource_limits.push(bollard::models::ResourcesUlimits {
                 name: Some("stack".to_string()),
                 soft: Some(512 * 1024),

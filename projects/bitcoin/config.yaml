@@ -22,3 +22,6 @@ sanitizers:
 - None
 
 fuzz_env_var: FUZZ
+
+no_stack_limit_harnesses:
+- str_printf

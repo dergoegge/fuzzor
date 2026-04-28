@@ -77,7 +77,6 @@ pub struct ProjectConfig {
     pub owner: String,
     pub repo: String,
     pub branch: Option<String>,
-    #[serde(default)]
     pub pr_number: Option<String>,
     pub language: Language,
     pub ccs: Vec<String>,
@@ -85,6 +84,7 @@ pub struct ProjectConfig {
     pub sanitizers: Option<Vec<Sanitizer>>,
     pub architectures: Option<Vec<CpuArchitecture>>,
     pub fuzz_env_var: Option<String>,
+    pub no_stack_limit_harnesses: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
@@ -107,6 +107,12 @@ impl ProjectConfig {
         }
 
         false
+    }
+
+    pub fn harness_has_no_stack_limit(&self, harness_name: &str) -> bool {
+        self.no_stack_limit_harnesses
+            .as_ref()
+            .is_some_and(|harnesses| harnesses.iter().any(|h| h == harness_name))
     }
 }
 
