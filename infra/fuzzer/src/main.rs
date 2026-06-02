@@ -117,6 +117,25 @@ impl FuzzerConfiguration {
         }
     }
 
+    fn configure_honggfuzz(&mut self) {
+        if !self.try_add_fuzzer(FuzzEngine::HonggFuzz, Sanitizer::None) {
+            return;
+        }
+
+        // TODO honggfuzz sanitizers
+
+        if !self.config.has_engine(&FuzzEngine::AflPlusPlus)
+            && !self.config.has_engine(&FuzzEngine::LibFuzzer)
+        {
+            // Allocate remaining cores to honggfuzz if afl++ and libfuzzer are not enabled
+            if self.has_available_cores() {
+                self.extra_args.push("--honggfuzz-add-cores".to_string());
+                self.extra_args
+                    .push((self.total_cores - self.cores_assigned).to_string());
+            }
+        }
+    }
+
     fn configure_aflplusplus(&mut self) {
         if self.try_add_fuzzer(FuzzEngine::AflPlusPlusNyx, Sanitizer::Address) {
             self.extra_args.push("--aflpp-nyx".to_string());
@@ -227,6 +246,7 @@ async fn main() -> Result<(), std::io::Error> {
     fuzzer_config.configure_native_go();
     fuzzer_config.configure_semsan();
     fuzzer_config.configure_libfuzzer();
+    fuzzer_config.configure_honggfuzz();
     fuzzer_config.configure_aflplusplus();
 
     // Build and execute command
