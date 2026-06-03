@@ -1,0 +1,15 @@
+name: rust-psbt
+
+owner: rust-bitcoin
+repo: rust-psbt
+branch: master
+
+language: Rust
+ccs:
+- dergoegge
+
+engines:
+- LibFuzzer
+sanitizers:
+- None
+- ValueProfile

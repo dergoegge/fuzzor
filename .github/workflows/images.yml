@@ -49,6 +49,13 @@ jobs:
       - uses: actions/checkout@v5
       - name: Build rust-lightning fuzzor image
         run: cd projects/rust-lightning && docker buildx build --tag fuzzor-rust-lightning:latest .
+  build-rust-psbt:
+    needs: [build-base-image]
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build rust-psbt fuzzor image
+        run: cd projects/rust-psbt && docker buildx build --tag fuzzor-rust-psbt:latest .
   build-openssl:
     needs: [build-base-image]
     runs-on: self-hosted
