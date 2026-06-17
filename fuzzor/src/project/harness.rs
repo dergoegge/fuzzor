@@ -210,7 +210,11 @@ impl HarnessState for PersistentHarnessState {
 
         let summary_path = campaign_dir.join("coverage-summary.json");
         if let Err(err) = tokio::fs::write(&summary_path, &summary).await {
-            log::error!("Could not write coverage summary to {:?}: {:?}", summary_path, err);
+            log::error!(
+                "Could not write coverage summary to {:?}: {:?}",
+                summary_path,
+                err
+            );
         }
     }
 
@@ -297,7 +301,10 @@ mod tests {
             .join("campaigns")
             .join("campaign-001")
             .join("startup_params.json");
-        assert!(params_path.exists(), "startup_params.json should be created");
+        assert!(
+            params_path.exists(),
+            "startup_params.json should be created"
+        );
 
         let content = tokio::fs::read_to_string(&params_path).await.unwrap();
         let loaded: CampaignStartupParams = serde_json::from_str(&content).unwrap();

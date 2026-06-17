@@ -590,9 +590,15 @@ where
             // Run the campaign in a separate task.
             let project_config = self.project_config.clone();
             let campaign_task = tokio::spawn(async move {
-                let mut campaign =
-                    Campaign::new(project_config, harness, env, event_sender, commit_hash, duration)
-                        .await;
+                let mut campaign = Campaign::new(
+                    project_config,
+                    harness,
+                    env,
+                    event_sender,
+                    commit_hash,
+                    duration,
+                )
+                .await;
                 campaign.run(quit_rx).await;
                 campaign
             });

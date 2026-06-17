@@ -439,7 +439,12 @@ impl Environment for DockerEnv {
 
         if let Some(entry) = tarball
             .entries()
-            .map_err(|e| format!("Could not get entries from covered functions tarball: {}", e))?
+            .map_err(|e| {
+                format!(
+                    "Could not get entries from covered functions tarball: {}",
+                    e
+                )
+            })?
             .next()
         {
             let mut contents = String::new();

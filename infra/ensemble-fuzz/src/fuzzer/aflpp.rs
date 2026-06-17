@@ -57,7 +57,8 @@ impl AflppFuzzer {
     }
 
     fn stderr_log_path(&self) -> PathBuf {
-        self.workspace.join(format!("aflpp_instance_{}.log", self.id))
+        self.workspace
+            .join(format!("aflpp_instance_{}.log", self.id))
     }
 
     fn queue_seed_count(&self) -> Option<u64> {
@@ -254,7 +255,11 @@ impl Fuzzer for AflppFuzzer {
         let log_path = self.stderr_log_path();
         let log_file = std::fs::File::create(&log_path).expect("Could not create AFL++ log file");
         if std::env::var("FUZZOR_AFL_DEBUG").is_ok() {
-            log::info!("AFL++ instance {} stderr is logged to {:?}", self.id, log_path);
+            log::info!(
+                "AFL++ instance {} stderr is logged to {:?}",
+                self.id,
+                log_path
+            );
         }
         command.stderr(Stdio::from(log_file));
 
