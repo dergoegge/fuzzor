@@ -1,4 +1,5 @@
-FROM fuzzor-base:latest
+ARG BASE_IMAGE=fuzzor-base:latest
+FROM ${BASE_IMAGE}
 
 ARG GCC_V
 ENV GCC_V=$GCC_V

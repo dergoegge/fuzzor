@@ -1,4 +1,5 @@
-FROM fuzzor-base
+ARG BASE_IMAGE=fuzzor-base
+FROM ${BASE_IMAGE}
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
   jq \

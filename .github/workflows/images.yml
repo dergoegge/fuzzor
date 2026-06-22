@@ -14,59 +14,44 @@ concurrency:
 
 jobs:
   build-base-image:
-    runs-on: self-hosted
+    runs-on: runs-on=${{ github.run_id }}/runner=32cpu-linux-x64/extras=ecr-cache/volume=120gb
     steps:
       - uses: actions/checkout@v5
-      - name: Build base fuzzor image
-        run: |
-          docker system prune --force
-          docker buildx build --build-arg=FUZZOR_CI=1 --tag fuzzor-base:latest --file infra/Dockerfile.base .
-  build-bitcoin:
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push base fuzzor image to ECR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/Dockerfile.base
+          build-args: FUZZOR_CI=1
+          push: true
+          tags: ${{ env.RUNS_ON_ECR_CACHE }}:fuzzor-base-${{ github.run_id }}
+          cache-from: type=registry,ref=${{ env.RUNS_ON_ECR_CACHE }}:fuzzor-base-cache
+          cache-to: type=registry,ref=${{ env.RUNS_ON_ECR_CACHE }}:fuzzor-base-cache,mode=max
+
+  build-project-images:
     needs: [build-base-image]
-    runs-on: self-hosted
+    runs-on: runs-on=${{ github.run_id }}/runner=8cpu-linux-x64/extras=ecr-cache/volume=120gb
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - bitcoin
+          - lnd
+          - core-lightning
+          - rust-lightning
+          - rust-psbt
+          - openssl
+          - secp256k1
     steps:
       - uses: actions/checkout@v5
-      - name: Build bitcoin fuzzor image
-        run: cd projects/bitcoin && docker buildx build --tag fuzzor-bitcoin:latest .
-  build-lnd:
-    needs: [build-base-image]
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v5
-      - name: Build lnd fuzzor image
-        run: cd projects/lnd && docker buildx build --tag fuzzor-lnd:latest .
-  build-core-lightning:
-    needs: [build-base-image]
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v5
-      - name: Build core-lightning fuzzor image
-        run: cd projects/core-lightning && docker buildx build --tag fuzzor-core-lightning:latest .
-  build-rust-lightning:
-    needs: [build-base-image]
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v5
-      - name: Build rust-lightning fuzzor image
-        run: cd projects/rust-lightning && docker buildx build --tag fuzzor-rust-lightning:latest .
-  build-rust-psbt:
-    needs: [build-base-image]
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v5
-      - name: Build rust-psbt fuzzor image
-        run: cd projects/rust-psbt && docker buildx build --tag fuzzor-rust-psbt:latest .
-  build-openssl:
-    needs: [build-base-image]
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v5
-      - name: Build openssl fuzzor image
-        run: cd projects/openssl && docker buildx build --tag fuzzor-openssl:latest .
-  build-secp256k1:
-    needs: [build-base-image]
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v5
-      - name: Build secp256k1 fuzzor image
-        run: cd projects/secp256k1 && docker buildx build --tag fuzzor-secp256k1:latest .
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.project }} fuzzor image
+        uses: docker/build-push-action@v6
+        with:
+          context: projects/${{ matrix.project }}
+          load: true
+          tags: fuzzor-${{ matrix.project }}:latest
+          build-args: BASE_IMAGE=${{ env.RUNS_ON_ECR_CACHE }}:fuzzor-base-${{ github.run_id }}
+          cache-from: type=registry,ref=${{ env.RUNS_ON_ECR_CACHE }}:fuzzor-${{ matrix.project }}-cache
+          cache-to: type=registry,ref=${{ env.RUNS_ON_ECR_CACHE }}:fuzzor-${{ matrix.project }}-cache,mode=max

@@ -1,4 +1,5 @@
-FROM fuzzor-base
+ARG BASE_IMAGE=fuzzor-base
+FROM ${BASE_IMAGE}
 
 # Install rust
 ENV PATH="/root/.cargo/bin:${PATH}"
